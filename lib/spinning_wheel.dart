@@ -54,7 +54,7 @@ class SpinningWheelState extends State<SpinningWheel>
   bool _isSpinning = false;
   bool _isResetting = false;
   double _currentRotation = 0;
-  String _currentSegment = '-';
+  String _currentSegment = '';
   final List<Timer> _scheduledSounds = [];
   final Map<String, ui.Image> _imageCache = {};
 
@@ -296,7 +296,7 @@ class SpinningWheelState extends State<SpinningWheel>
     // If we're already at the closest point, just update the display
     if ((currentRotation - closestRotation).abs() < 0.01) {
       setState(() {
-        _currentSegment = '-';
+        _currentSegment = '';
         _isResetting = false;
       });
       return;
@@ -420,7 +420,7 @@ class SpinningWheelState extends State<SpinningWheel>
           _currentSegment,
           style: TextStyle(
             fontSize: 56 * widget.headerTextSizeMultiplier,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             color: widget.headerTextColor,
           ),
         ),
