@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -11,7 +12,9 @@ class SpinningWheel extends StatefulWidget {
   final List<WheelItem> items;
   final Function(int) onFinished;
   final double size;
-  final double textSizeMultiplier;
+  final double textSizeMultiplier; // For segment text
+  final double headerTextSizeMultiplier; // For header text
+  final double imageSize; // For segment images
   final double cornerRadius;
   final double strokeWidth;
   final bool showBackgroundCircle;
@@ -26,6 +29,8 @@ class SpinningWheel extends StatefulWidget {
     required this.onFinished,
     this.size = 300,
     this.textSizeMultiplier = 1.0,
+    this.headerTextSizeMultiplier = 1.0,
+    this.imageSize = 60.0,
     this.cornerRadius = 8.0,
     this.strokeWidth = 3.0,
     this.showBackgroundCircle = true,
@@ -47,14 +52,17 @@ class SpinningWheelState extends State<SpinningWheel>
   int _currentAudioIndex = 0;
   static const int _poolSize = 100;
   bool _isSpinning = false;
+  bool _isResetting = false;
   double _currentRotation = 0;
   String _currentSegment = '-';
   final List<Timer> _scheduledSounds = [];
+  final Map<String, ui.Image> _imageCache = {};
 
   @override
   void initState() {
     super.initState();
     _initializeAudioPool();
+    _loadImages();
 
     _controller = AnimationController(
       duration: const Duration(milliseconds: 3000),
@@ -69,12 +77,16 @@ class SpinningWheelState extends State<SpinningWheel>
     });
 
     _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && !_isResetting) {
         setState(() {
           _isSpinning = false;
         });
         final winningIndex = _getWinningIndex();
         widget.onFinished(winningIndex);
+      } else if (status == AnimationStatus.completed && _isResetting) {
+        setState(() {
+          _isResetting = false;
+        });
       }
     });
   }
@@ -89,6 +101,53 @@ class SpinningWheelState extends State<SpinningWheel>
       }
     } catch (e) {
       // Ignore audio initialization errors
+    }
+  }
+
+  Future<void> _loadImages() async {
+    // Force an immediate repaint to show we're processing
+    setState(() {});
+
+    for (final item in widget.items) {
+      if (item.imagePath != null && !_imageCache.containsKey(item.imagePath)) {
+        try {
+          final file = File(item.imagePath!);
+          if (await file.exists()) {
+            final bytes = await file.readAsBytes();
+            final codec = await ui.instantiateImageCodec(bytes);
+            final frame = await codec.getNextFrame();
+            if (mounted) {
+              setState(() {
+                _imageCache[item.imagePath!] = frame.image;
+              });
+            }
+          }
+        } catch (e) {
+          // Ignore image loading errors
+          debugPrint('Error loading image ${item.imagePath}: $e');
+        }
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(SpinningWheel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload images if items changed or image paths changed
+    bool itemsChanged = oldWidget.items != widget.items;
+    bool imagePathsChanged = false;
+
+    if (oldWidget.items.length == widget.items.length) {
+      for (int i = 0; i < widget.items.length; i++) {
+        if (oldWidget.items[i].imagePath != widget.items[i].imagePath) {
+          imagePathsChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (itemsChanged || imagePathsChanged) {
+      _loadImages();
     }
   }
 
@@ -212,13 +271,48 @@ class SpinningWheelState extends State<SpinningWheel>
   }
 
   void reset() {
-    if (_isSpinning) return;
+    // Cancel any scheduled sounds
+    for (var timer in _scheduledSounds) {
+      timer.cancel();
+    }
+    _scheduledSounds.clear();
+
+    // Stop current animation
+    _controller.stop();
+
+    // Get current rotation for smooth animation
+    final currentRotation = _currentRotation;
 
     setState(() {
-      _currentRotation = 0;
-      _currentSegment = '-';
-      _updateCurrentSegment();
+      _isSpinning = false;
+      _isResetting = true;
     });
+
+    // Find the closest full rotation (multiple of 2π)
+    final fullRotation = 2 * pi;
+    final numRotations = (currentRotation / fullRotation).round();
+    final closestRotation = numRotations * fullRotation;
+
+    // If we're already at the closest point, just update the display
+    if ((currentRotation - closestRotation).abs() < 0.01) {
+      setState(() {
+        _currentSegment = '-';
+        _isResetting = false;
+      });
+      return;
+    }
+
+    // Animate to closest full rotation
+    _controller.duration = const Duration(milliseconds: 500);
+    _animation = Tween<double>(
+      begin: currentRotation,
+      end: closestRotation,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+
+    _controller.forward(from: 0);
   }
 
   void spin() {
@@ -254,6 +348,12 @@ class SpinningWheelState extends State<SpinningWheel>
       effectiveIntensity = (widget.spinIntensity + randomOffset).clamp(0.0, 1.0);
     }
 
+    // Calculate pullback amount based on intensity (in radians)
+    // Low intensity: ~10-15 degrees, High intensity: ~30-45 degrees
+    final basePullback = (10 + effectiveIntensity * 35) * (pi / 180); // Convert degrees to radians
+    final pullbackVariation = (Random().nextDouble() - 0.5) * 10 * (pi / 180); // ±5 degrees variation
+    final pullbackAmount = basePullback + pullbackVariation;
+
     // Intensity affects rotations (1-5 based on intensity)
     final baseRotations = 1 + (effectiveIntensity * 4).floor();
     final totalRotations = baseRotations + Random().nextDouble();
@@ -267,20 +367,45 @@ class SpinningWheelState extends State<SpinningWheel>
     // Intensity affects duration (2-6 seconds based on intensity)
     final baseDuration = 2000 + (effectiveIntensity * 4000).toInt();
     final randomDurationOffset = Random().nextInt(500) - 250;
-    final duration = Duration(milliseconds: baseDuration + randomDurationOffset);
-    _controller.duration = duration;
+    final mainDuration = Duration(milliseconds: baseDuration + randomDurationOffset);
+
+    // Start with pullback animation
+    final pullbackDuration = Duration(milliseconds: 200 + (effectiveIntensity * 100).toInt()); // 200-300ms based on intensity
+    _controller.duration = pullbackDuration;
 
     _animation = Tween<double>(
       begin: _currentRotation,
-      end: _currentRotation + finalRotation,
+      end: _currentRotation - pullbackAmount, // Pull back (negative rotation)
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic, // Matches the easing in the Angular version
+      curve: Curves.easeInOut,
     ));
 
-    // Pre-schedule all audio clicks based on segment changes
-    _preScheduleSounds(_currentRotation, finalRotation, duration);
+    // Listen for pullback completion to start main spin
+    void pullbackListener(AnimationStatus status) {
+      if (status == AnimationStatus.completed) {
+        _controller.removeStatusListener(pullbackListener);
 
+        // Start main spin from pullback position
+        final pullbackPosition = _currentRotation;
+        _controller.duration = mainDuration;
+
+        _animation = Tween<double>(
+          begin: pullbackPosition,
+          end: pullbackPosition + pullbackAmount + finalRotation, // Add back the pullback, then spin forward
+        ).animate(CurvedAnimation(
+          parent: _controller,
+          curve: Curves.easeOutCubic,
+        ));
+
+        // Pre-schedule all audio clicks based on segment changes
+        _preScheduleSounds(pullbackPosition, pullbackAmount + finalRotation, mainDuration);
+
+        _controller.forward(from: 0);
+      }
+    }
+
+    _controller.addStatusListener(pullbackListener);
     _controller.forward(from: 0);
   }
 
@@ -294,8 +419,8 @@ class SpinningWheelState extends State<SpinningWheel>
         Text(
           _currentSegment,
           style: TextStyle(
-            fontSize: 56 * widget.textSizeMultiplier,
-            fontWeight: FontWeight.bold,
+            fontSize: 56 * widget.headerTextSizeMultiplier,
+            fontWeight: FontWeight.w600,
             color: widget.headerTextColor,
           ),
         ),
@@ -316,11 +441,13 @@ class SpinningWheelState extends State<SpinningWheel>
                     textStyle: TextStyle(
                       color: Colors.white,
                       fontSize: (widget.items.length >= 16 ? 24 : fontSize) * widget.textSizeMultiplier,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                     cornerRadius: widget.cornerRadius,
                     strokeWidth: widget.strokeWidth,
                     showBackgroundCircle: widget.showBackgroundCircle,
+                    imageSize: widget.imageSize,
+                    imageCache: _imageCache,
                   ),
                 ),
               ),
@@ -373,28 +500,3 @@ class SpinningWheelState extends State<SpinningWheel>
   }
 }
 
-class PointerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.yellow
-      ..style = PaintingStyle.fill;
-
-    final strokePaint = Paint()
-      ..color = Colors.blue
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-
-    final path = Path()
-      ..moveTo(size.width / 2 - 40, 4)
-      ..lineTo(size.width / 2 + 40, 4)
-      ..lineTo(size.width / 2, 80)
-      ..close();
-
-    canvas.drawPath(path, paint);
-    canvas.drawPath(path, strokePaint);
-  }
-
-  @override
-  bool shouldRepaint(PointerPainter oldDelegate) => false;
-}

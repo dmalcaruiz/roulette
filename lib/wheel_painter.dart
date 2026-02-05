@@ -1,4 +1,6 @@
 import 'dart:math';
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'wheel_item.dart';
 
@@ -9,6 +11,8 @@ class WheelPainter extends CustomPainter {
   final double cornerRadius;
   final double strokeWidth;
   final bool showBackgroundCircle;
+  final double imageSize;
+  final Map<String, ui.Image> imageCache;
 
   WheelPainter({
     required this.items,
@@ -17,6 +21,8 @@ class WheelPainter extends CustomPainter {
     this.cornerRadius = 8.0,
     this.strokeWidth = 3.0,
     this.showBackgroundCircle = true,
+    this.imageSize = 60.0,
+    this.imageCache = const {},
   });
 
   @override
@@ -135,29 +141,70 @@ class WheelPainter extends CustomPainter {
         );
       }
 
-      // Draw text if there aren't too many items
-      if (items.length < 32) {
-        canvas.save();
-        canvas.translate(center.dx, center.dy);
-        canvas.rotate(startAngle + segmentSize / 2);
+      // Draw text and image
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(startAngle + segmentSize / 2);
 
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: item.text,
-            style: textStyle,
-          ),
-          textAlign: TextAlign.right,
-          textDirection: TextDirection.ltr,
+      // Clip to segment boundaries to prevent text overflow
+      canvas.clipRect(
+        Rect.fromLTRB(
+          centerInset,
+          -radius,
+          radius,
+          radius,
+        ),
+      );
+
+      // Draw image if available
+      if (item.imagePath != null && imageCache.containsKey(item.imagePath)) {
+        final image = imageCache[item.imagePath!]!;
+        final imageWidth = imageSize;
+        final imageHeight = imageSize;
+
+        // Position image in the segment
+        final imageX = radius - imageWidth - 20;
+        final imageY = -imageHeight / 2;
+
+        // Create rounded rectangle clip path for the image
+        final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
+        final imageRoundedRect = RRect.fromRectAndRadius(
+          imageRect,
+          Radius.circular(cornerRadius),
         );
 
-        textPainter.layout();
-        textPainter.paint(
-          canvas,
-          Offset(radius - textPainter.width - 20, -textPainter.height / 2),
+        canvas.save();
+        canvas.clipRRect(imageRoundedRect);
+
+        paintImage(
+          canvas: canvas,
+          rect: imageRect,
+          image: image,
+          fit: BoxFit.cover,
         );
 
         canvas.restore();
       }
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: item.text,
+          style: textStyle,
+        ),
+        textAlign: TextAlign.right,
+        textDirection: TextDirection.ltr,
+      );
+
+      textPainter.layout();
+
+      // Adjust text position if image is present
+      final textOffset = item.imagePath != null && imageCache.containsKey(item.imagePath)
+          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2)
+          : Offset(radius - textPainter.width - 20, -textPainter.height / 2);
+
+      textPainter.paint(canvas, textOffset);
+
+      canvas.restore();
 
       startAngle = endAngle;
     }
@@ -165,10 +212,17 @@ class WheelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(WheelPainter oldDelegate) {
+    // Check if image cache contents changed (not just reference)
+    bool imageCacheChanged = oldDelegate.imageCache.length != imageCache.length ||
+                             oldDelegate.imageCache.keys.any((key) => !imageCache.containsKey(key)) ||
+                             imageCache.keys.any((key) => !oldDelegate.imageCache.containsKey(key));
+
     return oldDelegate.rotation != rotation ||
            oldDelegate.items != items ||
            oldDelegate.cornerRadius != cornerRadius ||
            oldDelegate.strokeWidth != strokeWidth ||
-           oldDelegate.showBackgroundCircle != showBackgroundCircle;
+           oldDelegate.showBackgroundCircle != showBackgroundCircle ||
+           oldDelegate.imageSize != imageSize ||
+           imageCacheChanged;
   }
 }

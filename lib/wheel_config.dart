@@ -6,8 +6,11 @@ class WheelConfig {
   final String id;
   final String name;
   final List<WheelItem> items;
-  final double textSize;
+  final double textSize; // Segment text size
+  final double headerTextSize; // Header text size
+  final double imageSize; // Image size for segment images
   final double cornerRadius;
+  final double imageCornerRadius; // Corner radius for images
   final double strokeWidth;
   final bool showBackgroundCircle;
   final double centerMarkerSize;
@@ -17,7 +20,10 @@ class WheelConfig {
     required this.name,
     required this.items,
     this.textSize = 1.0,
+    this.headerTextSize = 1.0,
+    this.imageSize = 60.0,
     this.cornerRadius = 8.0,
+    this.imageCornerRadius = 8.0,
     this.strokeWidth = 3.0,
     this.showBackgroundCircle = true,
     this.centerMarkerSize = 200.0,
@@ -31,9 +37,13 @@ class WheelConfig {
         'text': item.text,
         'color': item.color.toARGB32(),
         'weight': item.weight,
+        'imagePath': item.imagePath,
       }).toList(),
       'textSize': textSize,
+      'headerTextSize': headerTextSize,
+      'imageSize': imageSize,
       'cornerRadius': cornerRadius,
+      'imageCornerRadius': imageCornerRadius,
       'strokeWidth': strokeWidth,
       'showBackgroundCircle': showBackgroundCircle,
       'centerMarkerSize': centerMarkerSize,
@@ -48,9 +58,13 @@ class WheelConfig {
         text: item['text'] as String,
         color: Color(item['color'] as int),
         weight: (item['weight'] as num).toDouble(),
+        imagePath: item['imagePath'] as String?,
       )).toList(),
       textSize: (json['textSize'] as num?)?.toDouble() ?? 1.0,
+      headerTextSize: (json['headerTextSize'] as num?)?.toDouble() ?? 1.0,
+      imageSize: (json['imageSize'] as num?)?.toDouble() ?? 60.0,
       cornerRadius: (json['cornerRadius'] as num?)?.toDouble() ?? 8.0,
+      imageCornerRadius: (json['imageCornerRadius'] as num?)?.toDouble() ?? 8.0,
       strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 3.0,
       showBackgroundCircle: (json['showBackgroundCircle'] as bool?) ?? true,
       centerMarkerSize: (json['centerMarkerSize'] as num?)?.toDouble() ?? 200.0,
@@ -68,7 +82,10 @@ class WheelConfig {
     String? name,
     List<WheelItem>? items,
     double? textSize,
+    double? headerTextSize,
+    double? imageSize,
     double? cornerRadius,
+    double? imageCornerRadius,
     double? strokeWidth,
     bool? showBackgroundCircle,
     double? centerMarkerSize,
@@ -78,7 +95,10 @@ class WheelConfig {
       name: name ?? this.name,
       items: items ?? this.items,
       textSize: textSize ?? this.textSize,
+      headerTextSize: headerTextSize ?? this.headerTextSize,
+      imageSize: imageSize ?? this.imageSize,
       cornerRadius: cornerRadius ?? this.cornerRadius,
+      imageCornerRadius: imageCornerRadius ?? this.imageCornerRadius,
       strokeWidth: strokeWidth ?? this.strokeWidth,
       showBackgroundCircle: showBackgroundCircle ?? this.showBackgroundCircle,
       centerMarkerSize: centerMarkerSize ?? this.centerMarkerSize,

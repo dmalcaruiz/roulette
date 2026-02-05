@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,13 @@ import 'wheel_manager.dart';
 import 'wheel_editor.dart';
 
 void main() {
+  // Global error handler to prevent crashes from rendering assertions
+  FlutterError.onError = (FlutterErrorDetails details) {
+    // Log the error but don't crash the app
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error (handled): ${details.exception}');
+  };
+
   runApp(const MyApp());
 }
 
@@ -47,6 +55,7 @@ class _WheelDemoState extends State<WheelDemo> {
   String _leftPanelView = 'manager'; // 'manager', 'current_wheel', 'new_wheel'
   WheelConfig? _editingWheel;
   WheelConfig? _previewWheel; // For real-time preview while editing
+  Timer? _autoSaveTimer;
 
   // Spin intensity controls
   double _spinIntensity = 0.5;
@@ -54,7 +63,7 @@ class _WheelDemoState extends State<WheelDemo> {
   final GlobalKey<SpinningWheelState> _wheelKey = GlobalKey<SpinningWheelState>();
 
   // Preset templates (mutable for reordering)
-  List<WheelConfig> _presets = [
+  final List<WheelConfig> _presets = [
     WheelConfig(
       id: 'preset_equal',
       name: 'Equal Prizes',
@@ -69,6 +78,8 @@ class _WheelDemoState extends State<WheelDemo> {
         WheelItem(text: 'Prize 8', color: Colors.amber, weight: 1),
       ],
       textSize: 1.0,
+      headerTextSize: 1.0,
+      imageSize: 60.0,
     ),
     WheelConfig(
       id: 'preset_weighted',
@@ -81,6 +92,8 @@ class _WheelDemoState extends State<WheelDemo> {
         WheelItem(text: 'Legendary', color: Colors.orange, weight: 0.5),
       ],
       textSize: 1.0,
+      headerTextSize: 1.0,
+      imageSize: 60.0,
     ),
     WheelConfig(
       id: 'preset_yesno',
@@ -90,6 +103,8 @@ class _WheelDemoState extends State<WheelDemo> {
         WheelItem(text: 'No', color: Colors.red, weight: 1),
       ],
       textSize: 1.0,
+      headerTextSize: 1.0,
+      imageSize: 60.0,
     ),
   ];
 
@@ -98,6 +113,12 @@ class _WheelDemoState extends State<WheelDemo> {
     super.initState();
     _initializeFirstLaunch();
     _loadWheels();
+  }
+
+  @override
+  void dispose() {
+    _autoSaveTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeFirstLaunch() async {
@@ -198,10 +219,12 @@ class _WheelDemoState extends State<WheelDemo> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: 'New Wheel',
       items: const [
-        WheelItem(text: 'Option 1', color: Colors.red, weight: 1.0),
-        WheelItem(text: 'Option 2', color: Colors.blue, weight: 1.0),
+        WheelItem(text: 'Option 1', color: Color(0xFF322d2a), weight: 1.0), // Color 10 - Dark Gray
+        WheelItem(text: 'Option 2', color: Color(0xFFfb2d29), weight: 1.0), // Color 1 - Red
       ],
       textSize: 1.0,
+      headerTextSize: 1.0,
+      imageSize: 60.0,
       cornerRadius: 8.0,
     );
 
@@ -352,10 +375,22 @@ class _WheelDemoState extends State<WheelDemo> {
     });
   }
 
-  void _handleWheelPreview(WheelConfig config) {
+  Future<void> _handleWheelPreview(WheelConfig config) async {
     setState(() {
       _previewWheel = config;
     });
+
+    // Debounce auto-save to avoid saving on every single change
+    if (_leftPanelView == 'current_wheel' && _currentWheel != null) {
+      _autoSaveTimer?.cancel();
+      _autoSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+        await _wheelManager.saveWheel(config);
+        // Update current wheel reference without reloading entire list
+        setState(() {
+          _currentWheel = config;
+        });
+      });
+    }
   }
 
   Widget _buildLeftPanel() {
@@ -400,19 +435,43 @@ class _WheelDemoState extends State<WheelDemo> {
                           physics: const NeverScrollableScrollPhysics(),
                           buildDefaultDragHandles: false,
                           itemCount: _savedWheels.length,
-                          onReorder: _reorderSavedWheels,
+                          onReorder: (oldIndex, newIndex) {
+                            try {
+                              _reorderSavedWheels(oldIndex, newIndex);
+                            } catch (e) {
+                              // Ignore Flutter rendering assertions during reorder
+                              debugPrint('Reorder error (safe to ignore): $e');
+                            }
+                          },
                           itemBuilder: (context, index) {
-                            final wheel = _savedWheels[index];
-                            final isSelected = _currentWheel?.id == wheel.id;
-                            return ReorderableDragStartListener(
+                            try {
+                              final wheel = _savedWheels[index];
+                              final isSelected = _currentWheel?.id == wheel.id;
+                              return ReorderableDragStartListener(
                               key: ValueKey(wheel.id),
                               index: index,
-                              child: Card(
-                                elevation: 0,
-                                color: isSelected ? const Color.fromARGB(255, 220, 240, 255) : null,
-                                shape: RoundedRectangleBorder(
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color.fromARGB(255, 220, 240, 255) : Colors.white,
                                   borderRadius: BorderRadius.circular(20),
-                                  side: const BorderSide(color: Colors.grey, width: 1.5),
+                                  border:  isSelected ? Border.all(color: Colors.blue, width: 1.5) : Border.all(color: Colors.grey, width: 1.5) ,
+                                  boxShadow: [
+                                    // Outer, softer shadow (more blurred, less opaque)
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 20,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                    // Inner, sharper shadow (more opaque, closer)
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.15),
+                                      blurRadius: 4,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
                                 child: ListTile(
                                 leading: Icon(
@@ -425,7 +484,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                     fontWeight: isSelected ? null : null,
                                   ),
                                 ),
-                                subtitle: Text('${wheel.items.length} segments • Text: ${wheel.textSize.toStringAsFixed(1)}x • Marker: ${wheel.centerMarkerSize.toStringAsFixed(0)}'),
+                                subtitle: Text('${wheel.items.length} segments'),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -450,6 +509,11 @@ class _WheelDemoState extends State<WheelDemo> {
                               ),
                             ),
                             );
+                            } catch (e) {
+                              // Fallback for rendering errors
+                              debugPrint('Wheel item render error: $e');
+                              return Container(key: ValueKey('error_${_savedWheels[index].id}'));
+                            }
                           },
                         ),
                 const SizedBox(height: 8),
@@ -555,19 +619,23 @@ class _WheelDemoState extends State<WheelDemo> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (_previewWheel != null || _currentWheel != null) ...[
-                      SpinningWheel(
-                        key: _wheelKey,
-                        items: (_previewWheel ?? _currentWheel)!.items,
-                        onFinished: _onWheelFinished,
-                        size: 700,
-                        textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize,
-                        cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius,
-                        strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth,
-                        showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
-                        centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize,
-                        spinIntensity: _spinIntensity,
-                        isRandomIntensity: _isRandomIntensity,
-                        headerTextColor: _textColor,
+                      RepaintBoundary(
+                        child: SpinningWheel(
+                          key: _wheelKey,
+                          items: (_previewWheel ?? _currentWheel)!.items,
+                          onFinished: _onWheelFinished,
+                          size: 700,
+                          textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize,
+                          headerTextSizeMultiplier: (_previewWheel ?? _currentWheel)!.headerTextSize,
+                          imageSize: (_previewWheel ?? _currentWheel)!.imageSize,
+                          cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius,
+                          strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth,
+                          showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
+                          centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize,
+                          spinIntensity: _spinIntensity,
+                          isRandomIntensity: _isRandomIntensity,
+                          headerTextColor: _textColor,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       // Spin controls in one row
@@ -577,6 +645,13 @@ class _WheelDemoState extends State<WheelDemo> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            IconButton(
+                              onPressed: () => _wheelKey.currentState?.reset(),
+                              icon: const Icon(Icons.restart_alt),
+                              iconSize: 32,
+                              tooltip: 'Reset wheel position',
+                            ),
+                            const SizedBox(width: 8),
                             ElevatedButton(
                               onPressed: () => _wheelKey.currentState?.spin(),
                               style: ElevatedButton.styleFrom(
@@ -586,13 +661,6 @@ class _WheelDemoState extends State<WheelDemo> {
                                 elevation: 0,
                               ),
                               child: const Text('SPIN', style: TextStyle(color: Colors.white)),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: () => _wheelKey.currentState?.reset(),
-                              icon: const Icon(Icons.restart_alt),
-                              iconSize: 32,
-                              tooltip: 'Reset wheel position',
                             ),
                             const SizedBox(width: 16),
                             Row(
