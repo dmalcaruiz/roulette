@@ -60,6 +60,7 @@ class WheelDemo extends StatefulWidget {
 class _WheelDemoState extends State<WheelDemo> {
   Color _backgroundColor = Colors.white;
   Color _textColor = Colors.black;
+  Color _overlayColor = Colors.black;
   final WheelManager _wheelManager = WheelManager();
   List<WheelConfig> _savedWheels = [];
   WheelConfig? _currentWheel;
@@ -204,6 +205,7 @@ class _WheelDemoState extends State<WheelDemo> {
       builder: (context) => _ColorPickerSheet(
         backgroundColor: _backgroundColor,
         textColor: _textColor,
+        overlayColor: _overlayColor,
         onBackgroundColorChanged: (color) {
           setState(() {
             _backgroundColor = color;
@@ -212,6 +214,11 @@ class _WheelDemoState extends State<WheelDemo> {
         onTextColorChanged: (color) {
           setState(() {
             _textColor = color;
+          });
+        },
+        onOverlayColorChanged: (color) {
+          setState(() {
+            _overlayColor = color;
           });
         },
       ),
@@ -649,6 +656,7 @@ class _WheelDemoState extends State<WheelDemo> {
                           spinIntensity: _spinIntensity,
                           isRandomIntensity: _isRandomIntensity,
                           headerTextColor: _textColor,
+                          overlayColor: _overlayColor,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -728,8 +736,9 @@ class _WheelDemoState extends State<WheelDemo> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(right: 16, bottom: 16),
         child: FloatingActionButton(
+          backgroundColor: Colors.black,
           onPressed: _openColorPickerBottomSheet,
-          child: const Icon(Icons.color_lens),
+          child: const Icon(Icons.color_lens, color: Colors.white),
         ),
       ),
     );
@@ -739,14 +748,18 @@ class _WheelDemoState extends State<WheelDemo> {
 class _ColorPickerSheet extends StatefulWidget {
   final Color backgroundColor;
   final Color textColor;
+  final Color overlayColor;
   final ValueChanged<Color> onBackgroundColorChanged;
   final ValueChanged<Color> onTextColorChanged;
+  final ValueChanged<Color> onOverlayColorChanged;
 
   const _ColorPickerSheet({
     required this.backgroundColor,
     required this.textColor,
+    required this.overlayColor,
     required this.onBackgroundColorChanged,
     required this.onTextColorChanged,
+    required this.onOverlayColorChanged,
   });
 
   @override
@@ -758,13 +771,15 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
   late TabController _tabController;
   late TextEditingController _bgHexController;
   late TextEditingController _textHexController;
+  late TextEditingController _overlayHexController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _bgHexController = TextEditingController(text: _colorToHex(widget.backgroundColor));
     _textHexController = TextEditingController(text: _colorToHex(widget.textColor));
+    _overlayHexController = TextEditingController(text: _colorToHex(widget.overlayColor));
   }
 
   @override
@@ -776,6 +791,9 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
     if (oldWidget.textColor != widget.textColor) {
       _textHexController.text = _colorToHex(widget.textColor);
     }
+    if (oldWidget.overlayColor != widget.overlayColor) {
+      _overlayHexController.text = _colorToHex(widget.overlayColor);
+    }
   }
 
   @override
@@ -783,6 +801,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
     _tabController.dispose();
     _bgHexController.dispose();
     _textHexController.dispose();
+    _overlayHexController.dispose();
     super.dispose();
   }
 
@@ -818,7 +837,8 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
             controller: _tabController,
             tabs: const [
               Tab(text: 'Background'),
-              Tab(text: 'Text'),
+              Tab(text: 'Header Text'),
+              Tab(text: 'Winner Overlay'),
             ],
             labelColor: Colors.black,
             indicatorSize: TabBarIndicatorSize.tab,
@@ -853,7 +873,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         decoration: const InputDecoration(
                           labelText: 'Hex',
                           border: OutlineInputBorder(),
-                          prefixText: '# ',
+                          prefixText: '',
                         ),
                         maxLength: 6,
                         onSubmitted: (value) {
@@ -902,6 +922,49 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         onSubmitted: (value) {
                           final c = _hexToColor(value);
                           if (c != null) widget.onTextColorChanged(c);
+                        },
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Done'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Overlay color picker
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      ColorPicker(
+                        color: widget.overlayColor,
+                        onColorChanged: widget.onOverlayColorChanged,
+                        wheelDiameter: 280,
+                        wheelWidth: 28,
+                        enableShadesSelection: false,
+                        pickersEnabled: const <ColorPickerType, bool>{
+                          ColorPickerType.both: false,
+                          ColorPickerType.primary: false,
+                          ColorPickerType.accent: false,
+                          ColorPickerType.wheel: true,
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _overlayHexController,
+                        decoration: const InputDecoration(
+                          labelText: 'Hex',
+                          border: OutlineInputBorder(),
+                          prefixText: '# ',
+                        ),
+                        maxLength: 6,
+                        onSubmitted: (value) {
+                          final c = _hexToColor(value);
+                          if (c != null) widget.onOverlayColorChanged(c);
                         },
                       ),
                       const Spacer(),

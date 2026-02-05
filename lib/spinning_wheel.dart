@@ -22,6 +22,7 @@ class SpinningWheel extends StatefulWidget {
   final double spinIntensity; // 0.0 to 1.0
   final bool isRandomIntensity;
   final Color headerTextColor;
+  final Color overlayColor;
 
   const SpinningWheel({
     super.key,
@@ -38,6 +39,7 @@ class SpinningWheel extends StatefulWidget {
     this.spinIntensity = 0.5,
     this.isRandomIntensity = true,
     this.headerTextColor = Colors.black,
+    this.overlayColor = Colors.black,
   });
 
   @override
@@ -45,18 +47,23 @@ class SpinningWheel extends StatefulWidget {
 }
 
 class SpinningWheelState extends State<SpinningWheel>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _overlayController;
   late Animation<double> _animation;
+  late Animation<double> _overlayAnimation;
   final List<AudioPlayer> _audioPool = [];
   int _currentAudioIndex = 0;
   static const int _poolSize = 100;
   bool _isSpinning = false;
   bool _isResetting = false;
+  bool _isPullingBack = false;
   double _currentRotation = 0;
   String _currentSegment = '';
   final List<Timer> _scheduledSounds = [];
   final Map<String, ui.Image> _imageCache = {};
+  int _winningIndex = -1;
+  double _overlayOpacity = 0.0;
 
   @override
   void initState() {
@@ -69,6 +76,19 @@ class SpinningWheelState extends State<SpinningWheel>
       vsync: this,
     );
 
+    _overlayController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _overlayAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _overlayController,
+      curve: Curves.easeInOut,
+    ));
+
     _controller.addListener(() {
       setState(() {
         _currentRotation = _animation.value;
@@ -76,12 +96,36 @@ class SpinningWheelState extends State<SpinningWheel>
       });
     });
 
+    _overlayController.addListener(() {
+      setState(() {
+        _overlayOpacity = _overlayAnimation.value;
+      });
+    });
+
     _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed && !_isResetting) {
+      if (status == AnimationStatus.completed && !_isResetting && !_isPullingBack) {
         setState(() {
           _isSpinning = false;
         });
         final winningIndex = _getWinningIndex();
+        _winningIndex = winningIndex;
+
+        // Start overlay animation (controls both dark overlay and winning segment as one layer)
+        _overlayController.forward().then((_) {
+          // After 2 seconds, fade back to normal
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              _overlayController.reverse().then((_) {
+                if (mounted) {
+                  setState(() {
+                    _winningIndex = -1;
+                  });
+                }
+              });
+            }
+          });
+        });
+
         widget.onFinished(winningIndex);
       } else if (status == AnimationStatus.completed && _isResetting) {
         setState(() {
@@ -154,6 +198,7 @@ class SpinningWheelState extends State<SpinningWheel>
   @override
   void dispose() {
     _controller.dispose();
+    _overlayController.dispose();
     for (var timer in _scheduledSounds) {
       timer.cancel();
     }
@@ -279,6 +324,7 @@ class SpinningWheelState extends State<SpinningWheel>
 
     // Stop current animation
     _controller.stop();
+    _overlayController.stop();
 
     // Get current rotation for smooth animation
     final currentRotation = _currentRotation;
@@ -286,7 +332,13 @@ class SpinningWheelState extends State<SpinningWheel>
     setState(() {
       _isSpinning = false;
       _isResetting = true;
+      _isPullingBack = false;
+      _winningIndex = -1;
+      _overlayOpacity = 0.0;
     });
+
+    // Reset overlay controller
+    _overlayController.reset();
 
     // Find the closest full rotation (multiple of 2π)
     final fullRotation = 2 * pi;
@@ -320,6 +372,7 @@ class SpinningWheelState extends State<SpinningWheel>
 
     setState(() {
       _isSpinning = true;
+      _isPullingBack = true;
     });
 
     final winningIndex = _getRandomWeightedIndex();
@@ -386,6 +439,10 @@ class SpinningWheelState extends State<SpinningWheel>
       if (status == AnimationStatus.completed) {
         _controller.removeStatusListener(pullbackListener);
 
+        setState(() {
+          _isPullingBack = false;
+        });
+
         // Start main spin from pullback position
         final pullbackPosition = _currentRotation;
         _controller.duration = mainDuration;
@@ -448,6 +505,9 @@ class SpinningWheelState extends State<SpinningWheel>
                     showBackgroundCircle: widget.showBackgroundCircle,
                     imageSize: widget.imageSize,
                     imageCache: _imageCache,
+                    overlayOpacity: _overlayOpacity,
+                    winningIndex: _winningIndex,
+                    overlayColor: widget.overlayColor,
                   ),
                 ),
               ),
