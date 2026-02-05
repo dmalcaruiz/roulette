@@ -8,6 +8,20 @@ import 'wheel_config.dart';
 import 'wheel_manager.dart';
 import 'wheel_editor.dart';
 
+String _colorToHex(Color c) {
+  return '#${c.red.toRadixString(16).padLeft(2, '0')}'
+      '${c.green.toRadixString(16).padLeft(2, '0')}'
+      '${c.blue.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
+}
+
+Color? _hexToColor(String s) {
+  final hex = s.trim().replaceFirst(RegExp(r'^#'), '');
+  if (hex.length != 6 || !RegExp(r'^[0-9A-Fa-f]+$').hasMatch(hex)) return null;
+  final n = int.tryParse(hex, radix: 16);
+  if (n == null) return null;
+  return Color(0xFF000000 | n);
+}
+
 void main() {
   // Global error handler to prevent crashes from rendering assertions
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -742,16 +756,33 @@ class _ColorPickerSheet extends StatefulWidget {
 class _ColorPickerSheetState extends State<_ColorPickerSheet>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late TextEditingController _bgHexController;
+  late TextEditingController _textHexController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _bgHexController = TextEditingController(text: _colorToHex(widget.backgroundColor));
+    _textHexController = TextEditingController(text: _colorToHex(widget.textColor));
+  }
+
+  @override
+  void didUpdateWidget(covariant _ColorPickerSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.backgroundColor != widget.backgroundColor) {
+      _bgHexController.text = _colorToHex(widget.backgroundColor);
+    }
+    if (oldWidget.textColor != widget.textColor) {
+      _textHexController.text = _colorToHex(widget.textColor);
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _bgHexController.dispose();
+    _textHexController.dispose();
     super.dispose();
   }
 
@@ -816,6 +847,20 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                           ColorPickerType.wheel: true,
                         },
                       ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _bgHexController,
+                        decoration: const InputDecoration(
+                          labelText: 'Hex',
+                          border: OutlineInputBorder(),
+                          prefixText: '# ',
+                        ),
+                        maxLength: 6,
+                        onSubmitted: (value) {
+                          final c = _hexToColor(value);
+                          if (c != null) widget.onBackgroundColorChanged(c);
+                        },
+                      ),
                       const Spacer(),
                       SizedBox(
                         width: double.infinity,
@@ -843,6 +888,20 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                           ColorPickerType.primary: false,
                           ColorPickerType.accent: false,
                           ColorPickerType.wheel: true,
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _textHexController,
+                        decoration: const InputDecoration(
+                          labelText: 'Hex',
+                          border: OutlineInputBorder(),
+                          prefixText: '# ',
+                        ),
+                        maxLength: 6,
+                        onSubmitted: (value) {
+                          final c = _hexToColor(value);
+                          if (c != null) widget.onTextColorChanged(c);
                         },
                       ),
                       const Spacer(),

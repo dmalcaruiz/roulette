@@ -6,6 +6,20 @@ import 'package:file_picker/file_picker.dart';
 import 'wheel_config.dart';
 import 'wheel_item.dart';
 
+String _colorToHex(Color c) {
+  return '#${c.red.toRadixString(16).padLeft(2, '0')}'
+      '${c.green.toRadixString(16).padLeft(2, '0')}'
+      '${c.blue.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
+}
+
+Color? _hexToColor(String s) {
+  final hex = s.trim().replaceFirst(RegExp(r'^#'), '');
+  if (hex.length != 6 || !RegExp(r'^[0-9A-Fa-f]+$').hasMatch(hex)) return null;
+  final n = int.tryParse(hex, radix: 16);
+  if (n == null) return null;
+  return Color(0xFF000000 | n);
+}
+
 class WheelEditor extends StatefulWidget {
   final WheelConfig? initialConfig;
   final Function(WheelConfig)? onSave;
@@ -40,6 +54,7 @@ class _WheelEditorState extends State<WheelEditor> {
   Timer? _previewDebounceTimer;
   final Map<String, TextEditingController> _weightControllers = {};
   final Map<String, TextEditingController> _segmentTextControllers = {};
+  final Map<String, TextEditingController> _hexControllers = {};
   late TextEditingController _textSizeController;
   late TextEditingController _headerTextSizeController;
   late TextEditingController _imageSizeController;
@@ -211,6 +226,8 @@ class _WheelEditorState extends State<WheelEditor> {
         _weightControllers.remove(segment.id);
         _segmentTextControllers[segment.id]?.dispose();
         _segmentTextControllers.remove(segment.id);
+        _hexControllers[segment.id]?.dispose();
+        _hexControllers.remove(segment.id);
       });
       _updatePreview(immediate: true);
     } else {
@@ -1052,6 +1069,7 @@ class _WheelEditorState extends State<WheelEditor> {
                                   onColorChanged: (Color color) {
                                     setState(() {
                                       segment.color = color;
+                                      _hexControllers[segment.id]?.text = _colorToHex(color);
                                     });
                                     _updatePreview();
                                   },
@@ -1063,6 +1081,28 @@ class _WheelEditorState extends State<WheelEditor> {
                                     ColorPickerType.primary: false,
                                     ColorPickerType.accent: false,
                                     ColorPickerType.wheel: true,
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _hexControllers.putIfAbsent(
+                                    segment.id,
+                                    () => TextEditingController(text: _colorToHex(segment.color)),
+                                  ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Hex',
+                                    border: OutlineInputBorder(),
+                                    prefixText: '# ',
+                                  ),
+                                  maxLength: 6,
+                                  onSubmitted: (value) {
+                                    final c = _hexToColor(value);
+                                    if (c != null) {
+                                      setState(() {
+                                        segment.color = c;
+                                      });
+                                      _updatePreview();
+                                    }
                                   },
                                 ),
                                 const SizedBox(height: 16),
