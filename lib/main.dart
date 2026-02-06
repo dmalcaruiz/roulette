@@ -9,7 +9,7 @@ import 'wheel_manager.dart';
 import 'wheel_editor.dart';
 
 String _colorToHex(Color c) {
-  return '#${c.red.toRadixString(16).padLeft(2, '0')}'
+  return '${c.red.toRadixString(16).padLeft(2, '0')}'
       '${c.green.toRadixString(16).padLeft(2, '0')}'
       '${c.blue.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
 }
@@ -75,6 +75,7 @@ class _WheelDemoState extends State<WheelDemo> {
   // Spin intensity controls
   double _spinIntensity = 0.5;
   bool _isRandomIntensity = true;
+  bool _showWinAnimation = true;
   final GlobalKey<SpinningWheelState> _wheelKey = GlobalKey<SpinningWheelState>();
 
   // Preset templates (mutable for reordering)
@@ -657,6 +658,7 @@ class _WheelDemoState extends State<WheelDemo> {
                           isRandomIntensity: _isRandomIntensity,
                           headerTextColor: _textColor,
                           overlayColor: _overlayColor,
+                          showWinAnimation: _showWinAnimation,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -696,6 +698,20 @@ class _WheelDemoState extends State<WheelDemo> {
                                   },
                                 ),
                                 const Text('Random'),
+                              ],
+                            ),
+                            const SizedBox(width: 8),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _showWinAnimation,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _showWinAnimation = value ?? true;
+                                    });
+                                  },
+                                ),
+                                const Text('Win Animation'),
                               ],
                             ),
                             if (!_isRandomIntensity) ...[
@@ -882,13 +898,6 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         },
                       ),
                       const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Done'),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -916,7 +925,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         decoration: const InputDecoration(
                           labelText: 'Hex',
                           border: OutlineInputBorder(),
-                          prefixText: '# ',
+                          prefixText: '',
                         ),
                         maxLength: 6,
                         onSubmitted: (value) {
@@ -925,13 +934,6 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         },
                       ),
                       const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Done'),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -959,7 +961,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         decoration: const InputDecoration(
                           labelText: 'Hex',
                           border: OutlineInputBorder(),
-                          prefixText: '# ',
+                          prefixText: '',
                         ),
                         maxLength: 6,
                         onSubmitted: (value) {
@@ -968,13 +970,6 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
                         },
                       ),
                       const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Done'),
-                        ),
-                      ),
                     ],
                   ),
                 ),

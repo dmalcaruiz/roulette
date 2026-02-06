@@ -23,6 +23,7 @@ class SpinningWheel extends StatefulWidget {
   final bool isRandomIntensity;
   final Color headerTextColor;
   final Color overlayColor;
+  final bool showWinAnimation;
 
   const SpinningWheel({
     super.key,
@@ -40,6 +41,7 @@ class SpinningWheel extends StatefulWidget {
     this.isRandomIntensity = true,
     this.headerTextColor = Colors.black,
     this.overlayColor = Colors.black,
+    this.showWinAnimation = true,
   });
 
   @override
@@ -110,21 +112,23 @@ class SpinningWheelState extends State<SpinningWheel>
         final winningIndex = _getWinningIndex();
         _winningIndex = winningIndex;
 
-        // Start overlay animation (controls both dark overlay and winning segment as one layer)
-        _overlayController.forward().then((_) {
-          // After 2 seconds, fade back to normal
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              _overlayController.reverse().then((_) {
-                if (mounted) {
-                  setState(() {
-                    _winningIndex = -1;
-                  });
-                }
-              });
-            }
+        // Start overlay animation only if enabled (controls both dark overlay and winning segment as one layer)
+        if (widget.showWinAnimation) {
+          _overlayController.forward().then((_) {
+            // After 2 seconds, fade back to normal
+            Future.delayed(const Duration(seconds: 2), () {
+              if (mounted) {
+                _overlayController.reverse().then((_) {
+                  if (mounted) {
+                    setState(() {
+                      _winningIndex = -1;
+                    });
+                  }
+                });
+              }
+            });
           });
-        });
+        }
 
         widget.onFinished(winningIndex);
       } else if (status == AnimationStatus.completed && _isResetting) {

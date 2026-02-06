@@ -7,7 +7,7 @@ import 'wheel_config.dart';
 import 'wheel_item.dart';
 
 String _colorToHex(Color c) {
-  return '#${c.red.toRadixString(16).padLeft(2, '0')}'
+  return '${c.red.toRadixString(16).padLeft(2, '0')}'
       '${c.green.toRadixString(16).padLeft(2, '0')}'
       '${c.blue.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
 }
@@ -1092,7 +1092,7 @@ class _WheelEditorState extends State<WheelEditor> {
                                   decoration: const InputDecoration(
                                     labelText: 'Hex',
                                     border: OutlineInputBorder(),
-                                    prefixText: '# ',
+                                    prefixText: '',
                                   ),
                                   maxLength: 6,
                                   onSubmitted: (value) {
