@@ -56,7 +56,7 @@ class SpinningWheelState extends State<SpinningWheel>
   late Animation<double> _overlayAnimation;
   final List<AudioPlayer> _audioPool = [];
   int _currentAudioIndex = 0;
-  static const int _poolSize = 100;
+  static const int _poolSize = 300; // Increased pool size for intense spinning
   bool _isSpinning = false;
   bool _isResetting = false;
   bool _isPullingBack = false;
@@ -141,7 +141,6 @@ class SpinningWheelState extends State<SpinningWheel>
 
   Future<void> _initializeAudioPool() async {
     try {
-      // Create a pool of audio players with low latency mode
       for (int i = 0; i < _poolSize; i++) {
         final player = AudioPlayer();
         await player.setPlayerMode(PlayerMode.lowLatency);
@@ -217,9 +216,9 @@ class SpinningWheelState extends State<SpinningWheel>
 
     try {
       final player = _audioPool[_currentAudioIndex];
-      // Play from source - low latency mode makes this fast
-      player.play(AssetSource('audio/click.mp3'), volume: 1.0);
       _currentAudioIndex = (_currentAudioIndex + 1) % _audioPool.length;
+      // play() handles all state management internally - no manual seek/resume needed
+      player.play(AssetSource('audio/click.mp3')).catchError((_) {});
     } catch (e) {
       // Ignore audio errors
     }
@@ -400,20 +399,37 @@ class SpinningWheelState extends State<SpinningWheel>
       // Fully random
       effectiveIntensity = Random().nextDouble();
     } else {
-      // Use slider value with ±20% randomness
-      final randomOffset = (Random().nextDouble() - 0.5) * 0.4; // -0.2 to +0.2
+      // Use slider value with minimal randomness (±3%) for more predictable spins
+      final randomOffset = (Random().nextDouble() - 0.5) * 0.06; // -0.03 to +0.03
       effectiveIntensity = (widget.spinIntensity + randomOffset).clamp(0.0, 1.0);
     }
 
     // Calculate pullback amount based on intensity (in radians)
-    // Low intensity: ~10-15 degrees, High intensity: ~30-45 degrees
-    final basePullback = (10 + effectiveIntensity * 35) * (pi / 180); // Convert degrees to radians
-    final pullbackVariation = (Random().nextDouble() - 0.5) * 10 * (pi / 180); // ±5 degrees variation
+    final double basePullback;
+    final double pullbackVariation;
+    if (widget.isRandomIntensity) {
+      // Original range: 10-45 degrees
+      basePullback = (10 + effectiveIntensity * 35) * (pi / 180);
+      pullbackVariation = (Random().nextDouble() - 0.5) * 10 * (pi / 180); // ±5 degrees variation
+    } else {
+      // Dramatic range: 5-50 degrees for more obvious difference
+      basePullback = (5 + effectiveIntensity * 45) * (pi / 180);
+      pullbackVariation = (Random().nextDouble() - 0.5) * 2 * (pi / 180); // ±1 degree variation
+    }
     final pullbackAmount = basePullback + pullbackVariation;
 
-    // Intensity affects rotations (1-5 based on intensity)
-    final baseRotations = 1 + (effectiveIntensity * 4).floor();
-    final totalRotations = baseRotations + Random().nextDouble();
+    // Intensity affects rotations
+    final int baseRotations;
+    final double totalRotations;
+    if (widget.isRandomIntensity) {
+      // Original range: 1-5 rotations
+      baseRotations = 1 + (effectiveIntensity * 4).floor();
+      totalRotations = baseRotations + Random().nextDouble();
+    } else {
+      // Dramatic range: 1-7 rotations for more obvious difference
+      baseRotations = 1 + (effectiveIntensity * 6).floor();
+      totalRotations = baseRotations + Random().nextDouble() * 0.2; // Less variation
+    }
 
     // Random offset within the winning segment
     final offset = Random().nextDouble() * winningSegmentSize;
@@ -421,13 +437,30 @@ class SpinningWheelState extends State<SpinningWheel>
     // Calculate final rotation
     final finalRotation = totalRotations * 2 * pi + (2 * pi - winningAngle + offset);
 
-    // Intensity affects duration (2-6 seconds based on intensity)
-    final baseDuration = 2000 + (effectiveIntensity * 4000).toInt();
-    final randomDurationOffset = Random().nextInt(500) - 250;
+    // Intensity affects duration
+    final int baseDuration;
+    final int randomDurationOffset;
+    if (widget.isRandomIntensity) {
+      // Original range: 2-6 seconds
+      baseDuration = 2000 + (effectiveIntensity * 4000).toInt();
+      randomDurationOffset = Random().nextInt(500) - 250; // ±250ms variation
+    } else {
+      // Dramatic range: 1.5-7 seconds for more obvious difference
+      baseDuration = 1500 + (effectiveIntensity * 5500).toInt();
+      randomDurationOffset = Random().nextInt(100) - 50; // ±50ms variation
+    }
     final mainDuration = Duration(milliseconds: baseDuration + randomDurationOffset);
 
     // Start with pullback animation
-    final pullbackDuration = Duration(milliseconds: 200 + (effectiveIntensity * 100).toInt()); // 200-300ms based on intensity
+    final int pullbackDurationMs;
+    if (widget.isRandomIntensity) {
+      // Original range: 200-300ms
+      pullbackDurationMs = 200 + (effectiveIntensity * 100).toInt();
+    } else {
+      // Dramatic range: 150-350ms
+      pullbackDurationMs = 150 + (effectiveIntensity * 200).toInt();
+    }
+    final pullbackDuration = Duration(milliseconds: pullbackDurationMs);
     _controller.duration = pullbackDuration;
 
     _animation = Tween<double>(
