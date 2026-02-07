@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'wheel_config.dart';
 import 'wheel_item.dart';
 
@@ -377,621 +378,150 @@ class _WheelEditorState extends State<WheelEditor> {
 
 
 
+  void _openSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48, height: 5,
+                decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(3)),
+              ),
+              const SizedBox(height: 20),
+              const Text('Wheel Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 20),
+              _settingSlider('Segment Text', _textSize, 0.05, 1.5, 29, (v) { setSheetState(() => _textSize = v); setState(() { _textSize = v; _textSizeController.text = v.toStringAsFixed(2); }); _updatePreview(); }),
+              _settingSlider('Header Text', _headerTextSize, 0.05, 2.0, 200, (v) { setSheetState(() => _headerTextSize = v); setState(() { _headerTextSize = v; _headerTextSizeController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+              _settingSlider('Image Size', _imageSize, 20, 150, 130, (v) { setSheetState(() => _imageSize = v); setState(() { _imageSize = v; _imageSizeController.text = v.toStringAsFixed(0); }); _updatePreview(); }),
+              _settingSlider('Corner Radius', _cornerRadius, 0, 100, 40, (v) { setSheetState(() => _cornerRadius = v); setState(() { _cornerRadius = v; _cornerRadiusController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+              _settingSlider('Stroke Width', _strokeWidth, 0, 10, 100, (v) { setSheetState(() => _strokeWidth = v); setState(() { _strokeWidth = v; _strokeWidthController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+              _settingSlider('Center Marker', _centerMarkerSize, 100, 250, 150, (v) { setSheetState(() => _centerMarkerSize = v); setState(() { _centerMarkerSize = v; _centerMarkerSizeController.text = v.toStringAsFixed(0); }); _updatePreview(); }),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () {
+                  setSheetState(() => _showBackgroundCircle = !_showBackgroundCircle);
+                  setState(() {});
+                  _updatePreview();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _showBackgroundCircle ? const Color(0xFF38BDF8).withValues(alpha: 0.12) : const Color(0xFFF4F4F5),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _showBackgroundCircle ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8), width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(_showBackgroundCircle ? Icons.check_circle_rounded : Icons.circle_outlined, color: _showBackgroundCircle ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8), size: 22),
+                      const SizedBox(width: 12),
+                      Text('Background Circle', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _showBackgroundCircle ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.5))),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _settingSlider(String label, double value, double min, double max, int divisions, ValueChanged<double> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          SizedBox(width: 100, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+          Expanded(
+            child: Slider(value: value, min: min, max: max, divisions: divisions, onChanged: onChanged),
+          ),
+          SizedBox(width: 44, child: Text(max > 10 ? value.toStringAsFixed(0) : value.toStringAsFixed(1), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             widget.initialConfig != null ? 'Edit Wheel' : 'Create Wheel',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _nameController,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            onChanged: (value) => _updatePreview(),
           ),
           const SizedBox(height: 16),
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Wheel Name',
-                border: OutlineInputBorder(),
-              ),
-              style: const TextStyle(fontSize: 18),
-              onChanged: (value) {
-                _updatePreview();
-              },
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                const Text(
-                  'Segment Text Size: ',
-                  style: TextStyle(fontSize: 16),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _textSize,
-                    min: 0.05,
-                    max: 1.5,
-                    divisions: 29,
-                    label: _textSize.toStringAsFixed(2),
-                    onChanged: (value) {
-                      setState(() {
-                        _textSize = value;
-                        _textSizeController.text = value.toStringAsFixed(2);
-                      });
-                      _updatePreview();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _textSize = (_textSize + 0.05).clamp(0.05, 1.5);
-                                _textSizeController.text = _textSize.toStringAsFixed(2);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _textSize = (_textSize - 0.05).clamp(0.05, 1.5);
-                                _textSizeController.text = _textSize.toStringAsFixed(2);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _textSizeController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        final newValue = double.tryParse(value);
-                        if (newValue != null && newValue >= 0.05 && newValue <= 1.5) {
-                          setState(() {
-                            _textSize = newValue;
-                            _textSizeController.text = newValue.toStringAsFixed(2);
-                          });
-                          _updatePreview();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text(
-                  'Header Text Size: ',
-                  style: TextStyle(fontSize: 16),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _headerTextSize,
-                    min: 0.05,
-                    max: 2.0,
-                    divisions: 200,
-                    label: _headerTextSize.toStringAsFixed(1),
-                    onChanged: (value) {
-                      setState(() {
-                        _headerTextSize = value;
-                        _headerTextSizeController.text = value.toStringAsFixed(1);
-                      });
-                      _updatePreview();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _headerTextSize = (_headerTextSize + 0.1).clamp(0.05, 2.0);
-                                _headerTextSizeController.text = _headerTextSize.toStringAsFixed(1);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _headerTextSize = (_headerTextSize - 0.1).clamp(0.05, 2.0);
-                                _headerTextSizeController.text = _headerTextSize.toStringAsFixed(1);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _headerTextSizeController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        final newValue = double.tryParse(value);
-                        if (newValue != null && newValue >= 0.05 && newValue <= 2.0) {
-                          setState(() {
-                            _headerTextSize = newValue;
-                          });
-                          _updatePreview();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text(
-                  'Image Size: ',
-                  style: TextStyle(fontSize: 16),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _imageSize,
-                    min: 20.0,
-                    max: 150.0,
-                    divisions: 130,
-                    label: _imageSize.toStringAsFixed(0),
-                    onChanged: (value) {
-                      setState(() {
-                        _imageSize = value;
-                        _imageSizeController.text = value.toStringAsFixed(0);
-                      });
-                      _updatePreview();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _imageSize = (_imageSize + 1.0).clamp(20.0, 150.0);
-                                _imageSizeController.text = _imageSize.toStringAsFixed(0);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _imageSize = (_imageSize - 1.0).clamp(20.0, 150.0);
-                                _imageSizeController.text = _imageSize.toStringAsFixed(0);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _imageSizeController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        final newValue = double.tryParse(value);
-                        if (newValue != null && newValue >= 20.0 && newValue <= 150.0) {
-                          setState(() {
-                            _imageSize = newValue;
-                          });
-                          _updatePreview();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text(
-                  'Corner Radius: ',
-                  style: TextStyle(fontSize: 16),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _cornerRadius,
-                    min: 0.0,
-                    max: 100.0,
-                    divisions: 40,
-                    label: _cornerRadius.toStringAsFixed(1),
-                    onChanged: (value) {
-                      setState(() {
-                        _cornerRadius = value;
-                        _cornerRadiusController.text = value.toStringAsFixed(1);
-                      });
-                      _updatePreview();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _cornerRadius = (_cornerRadius + 0.1).clamp(0.0, 100.0);
-                                _cornerRadiusController.text = _cornerRadius.toStringAsFixed(1);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _cornerRadius = (_cornerRadius - 0.1).clamp(0.0, 100.0);
-                                _cornerRadiusController.text = _cornerRadius.toStringAsFixed(1);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _cornerRadiusController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        final newValue = double.tryParse(value);
-                        if (newValue != null && newValue >= 0.0 && newValue <= 100.0) {
-                          setState(() {
-                            _cornerRadius = newValue;
-                          });
-                          _updatePreview();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text(
-                  'Stroke Width: ',
-                  style: TextStyle(fontSize: 16),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _strokeWidth,
-                    min: 0.0,
-                    max: 10.0,
-                    divisions: 100,
-                    label: _strokeWidth.toStringAsFixed(1),
-                    onChanged: (value) {
-                      setState(() {
-                        _strokeWidth = value;
-                        _strokeWidthController.text = value.toStringAsFixed(1);
-                      });
-                      _updatePreview();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _strokeWidth = (_strokeWidth + 0.1).clamp(0.0, 10.0);
-                                _strokeWidthController.text = _strokeWidth.toStringAsFixed(1);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _strokeWidth = (_strokeWidth - 0.1).clamp(0.0, 10.0);
-                                _strokeWidthController.text = _strokeWidth.toStringAsFixed(1);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _strokeWidthController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        final newValue = double.tryParse(value);
-                        if (newValue != null && newValue >= 0.0 && newValue <= 10.0) {
-                          setState(() {
-                            _strokeWidth = newValue;
-                          });
-                          _updatePreview();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Checkbox(
-                  value: _showBackgroundCircle,
-                  onChanged: (value) {
-                    setState(() {
-                      _showBackgroundCircle = value ?? true;
-                    });
-                    _updatePreview();
-                  },
-                ),
-                const Text(
-                  'Show background circle',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text(
-                  'Center Marker Size: ',
-                  style: TextStyle(fontSize: 16),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _centerMarkerSize,
-                    min: 100.0,
-                    max: 250.0,
-                    divisions: 150,
-                    label: _centerMarkerSize.toStringAsFixed(0),
-                    onChanged: (value) {
-                      setState(() {
-                        _centerMarkerSize = value;
-                        _centerMarkerSizeController.text = value.toStringAsFixed(0);
-                      });
-                      _updatePreview();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  child: Focus(
-                    onKeyEvent: (node, event) {
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _centerMarkerSize = (_centerMarkerSize + 1.0).clamp(100.0, 250.0);
-                                _centerMarkerSizeController.text = _centerMarkerSize.toStringAsFixed(0);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (event is KeyDownEvent) {
-                          if (_keyRepeatTimer == null) {
-                            _startKeyRepeat(() {
-                              setState(() {
-                                _centerMarkerSize = (_centerMarkerSize - 1.0).clamp(100.0, 250.0);
-                                _centerMarkerSizeController.text = _centerMarkerSize.toStringAsFixed(0);
-                              });
-                              _updatePreview();
-                            });
-                          }
-                          return KeyEventResult.handled;
-                        } else if (event is KeyUpEvent) {
-                          _stopKeyRepeat();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _centerMarkerSizeController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onChanged: (value) {
-                        final newValue = double.tryParse(value);
-                        if (newValue != null && newValue >= 100.0 && newValue <= 250.0) {
-                          setState(() {
-                            _centerMarkerSize = newValue;
-                          });
-                          _updatePreview();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Segments',
-              style: TextStyle(fontSize: 20),
-            ),
-            const SizedBox(height: 16),
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              itemCount: _segments.length,
-              onReorder: (oldIndex, newIndex) {
-                try {
-                  _reorderSegments(oldIndex, newIndex);
-                } catch (e) {
-                  // Ignore Flutter rendering assertions during reorder
-                  debugPrint('Reorder error (safe to ignore): $e');
-                }
-              },
-              itemBuilder: (context, index) {
-                try {
-                  final segment = _segments[index];
-                  final card = Container(
-                  margin: const EdgeInsets.only(bottom: 12),
+          // Settings button — opens all sliders in a bottom sheet
+          _editorPillButton(
+            icon: Icons.tune_rounded,
+            label: 'Wheel Settings',
+            onTap: _openSettingsSheet,
+            color: const Color(0xFFF4F4F5),
+            textColor: const Color(0xFF1E1E2C),
+            borderColor: const Color(0xFFD4D4D8),
+          ),
+          const SizedBox(height: 24),
+          const Text('Segments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: _segments.length,
+            onReorder: (oldIndex, newIndex) {
+              try {
+                _reorderSegments(oldIndex, newIndex);
+              } catch (e) {
+                debugPrint('Reorder error (safe to ignore): $e');
+              }
+            },
+            itemBuilder: (context, index) {
+              try {
+                final segment = _segments[index];
+                final card = Container(
+                  margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey, width: 1.5),
-                    boxShadow: [
-                      // Outer, softer shadow (more blurred, less opaque)
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 20,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 4),
-                      ),
-                      // Inner, sharper shadow (more opaque, closer)
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 4,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            InkWell(
+                            // Color swatch
+                            GestureDetector(
                               onTap: () => _pickColor(index),
                               child: Container(
-                                width: 50,
-                                height: 50,
+                                width: 44,
+                                height: 44,
                                 decoration: BoxDecoration(
                                   color: segment.color,
-                                  border: Border.all(color: Colors.grey),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [BoxShadow(color: segment.color.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))],
                                 ),
-                                child: const Icon(Icons.color_lens, color: Colors.white),
+                                child: const Icon(Icons.palette_rounded, color: Colors.white, size: 20),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1001,12 +531,8 @@ class _WheelEditorState extends State<WheelEditor> {
                                   builder: (context) {
                                     try {
                                       return TextField(
-                                        decoration: const InputDecoration(
-                                          labelText: 'Text',
-                                          border: OutlineInputBorder(),
-                                        ),
                                         controller: _segmentTextControllers[segment.id],
-                                        // Disable text selection during drag to prevent rendering assertions
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
                                         enableInteractiveSelection: _editingColorIndex != null || true,
                                         onChanged: (value) {
                                           try {
@@ -1025,42 +551,25 @@ class _WheelEditorState extends State<WheelEditor> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: Icon(
-                                segment.imagePath != null ? Icons.image : Icons.add_photo_alternate,
-                                color: segment.imagePath != null ? Colors.blue : null,
-                              ),
-                              onPressed: () => _pickImage(index),
-                              tooltip: segment.imagePath != null ? 'Change image' : 'Add image',
+                            const SizedBox(width: 4),
+                            _segIconBtn(
+                              segment.imagePath != null ? Icons.image_rounded : Icons.add_photo_alternate_rounded,
+                              () => _pickImage(index),
+                              active: segment.imagePath != null,
                             ),
                             if (segment.imagePath != null)
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: () => _removeImage(index),
-                                tooltip: 'Remove image',
-                                iconSize: 20,
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.content_copy),
-                              onPressed: () => _duplicateSegment(index),
-                              tooltip: 'Duplicate segment',
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _removeSegment(index),
-                              color: Colors.red,
-                              tooltip: 'Delete segment',
-                            ),
+                              _segIconBtn(Icons.close_rounded, () => _removeImage(index)),
+                            _segIconBtn(Icons.copy_rounded, () => _duplicateSegment(index)),
+                            _segIconBtn(Icons.delete_rounded, () => _removeSegment(index), color: const Color(0xFFEF4444)),
                           ],
                         ),
                         if (_editingColorIndex == index) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(0xFFF4F4F5),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: Column(
                               children: [
@@ -1073,8 +582,8 @@ class _WheelEditorState extends State<WheelEditor> {
                                     });
                                     _updatePreview();
                                   },
-                                  wheelDiameter: 280,
-                                  wheelWidth: 28,
+                                  wheelDiameter: 260,
+                                  wheelWidth: 26,
                                   enableShadesSelection: false,
                                   pickersEnabled: const <ColorPickerType, bool>{
                                     ColorPickerType.both: false,
@@ -1089,70 +598,41 @@ class _WheelEditorState extends State<WheelEditor> {
                                     segment.id,
                                     () => TextEditingController(text: _colorToHex(segment.color)),
                                   ),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Hex',
-                                    border: OutlineInputBorder(),
-                                    prefixText: '',
-                                  ),
                                   maxLength: 6,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
                                   onSubmitted: (value) {
                                     final c = _hexToColor(value);
                                     if (c != null) {
-                                      setState(() {
-                                        segment.color = c;
-                                      });
+                                      setState(() => segment.color = c);
                                       _updatePreview();
                                     }
                                   },
                                 ),
-                                const SizedBox(height: 16),
-                                _buildHSBSlider(
-                                  'Hue',
-                                  HSVColor.fromColor(segment.color).hue,
-                                  0,
-                                  360,
-                                  (value) {
-                                    final hsv = HSVColor.fromColor(segment.color);
-                                    setState(() {
-                                      segment.color = hsv.withHue(value).toColor();
-                                    });
-                                    _updatePreview();
-                                  },
-                                ),
-                                _buildHSBSlider(
-                                  'Saturation',
-                                  HSVColor.fromColor(segment.color).saturation,
-                                  0,
-                                  1,
-                                  (value) {
-                                    final hsv = HSVColor.fromColor(segment.color);
-                                    setState(() {
-                                      segment.color = hsv.withSaturation(value).toColor();
-                                    });
-                                    _updatePreview();
-                                  },
-                                ),
-                                _buildHSBSlider(
-                                  'Brightness',
-                                  HSVColor.fromColor(segment.color).value,
-                                  0,
-                                  1,
-                                  (value) {
-                                    final hsv = HSVColor.fromColor(segment.color);
-                                    setState(() {
-                                      segment.color = hsv.withValue(value).toColor();
-                                    });
-                                    _updatePreview();
-                                  },
-                                ),
+                                const SizedBox(height: 8),
+                                _buildHSBSlider('Hue', HSVColor.fromColor(segment.color).hue, 0, 360, (value) {
+                                  final hsv = HSVColor.fromColor(segment.color);
+                                  setState(() => segment.color = hsv.withHue(value).toColor());
+                                  _updatePreview();
+                                }),
+                                _buildHSBSlider('Saturation', HSVColor.fromColor(segment.color).saturation, 0, 1, (value) {
+                                  final hsv = HSVColor.fromColor(segment.color);
+                                  setState(() => segment.color = hsv.withSaturation(value).toColor());
+                                  _updatePreview();
+                                }),
+                                _buildHSBSlider('Brightness', HSVColor.fromColor(segment.color).value, 0, 1, (value) {
+                                  final hsv = HSVColor.fromColor(segment.color);
+                                  setState(() => segment.color = hsv.withValue(value).toColor());
+                                  _updatePreview();
+                                }),
                               ],
                             ),
                           ),
                         ],
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         Row(
                           children: [
-                            const Text('Weight: ', style: TextStyle(fontSize: 14)),
+                            Text('Weight', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5))),
+                            const SizedBox(width: 4),
                             Expanded(
                               child: Slider(
                                 value: segment.weight,
@@ -1170,7 +650,7 @@ class _WheelEditorState extends State<WheelEditor> {
                               ),
                             ),
                             SizedBox(
-                              width: 60,
+                              width: 56,
                               child: RepaintBoundary(
                                 child: Focus(
                                   onKeyEvent: (node, event) {
@@ -1216,12 +696,10 @@ class _WheelEditorState extends State<WheelEditor> {
                                           controller: _weightControllers[segment.id],
                                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(fontSize: 14),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                           decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
                                             contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                           ),
-                                          // Disable text selection during drag to prevent rendering assertions
                                           enableInteractiveSelection: _editingColorIndex != null || true,
                                           onChanged: (value) {
                                             try {
@@ -1251,58 +729,84 @@ class _WheelEditorState extends State<WheelEditor> {
                   ),
                 );
 
-                  // Only allow reordering when no color picker is active
-                  if (_editingColorIndex == null) {
-                    return ReorderableDragStartListener(
-                      key: ValueKey(segment.id),
-                      index: index,
-                      child: RepaintBoundary(child: card),
-                    );
-                  } else {
-                    return Container(
-                      key: ValueKey(segment.id),
-                      child: RepaintBoundary(child: card),
-                    );
-                  }
-                } catch (e) {
-                  // Fallback for rendering errors
-                  debugPrint('Segment render error: $e');
-                  return Container(key: ValueKey('error_${_segments[index].id}'));
+                if (_editingColorIndex == null) {
+                  return ReorderableDragStartListener(
+                    key: ValueKey(segment.id),
+                    index: index,
+                    child: RepaintBoundary(child: card),
+                  );
+                } else {
+                  return Container(
+                    key: ValueKey(segment.id),
+                    child: RepaintBoundary(child: card),
+                  );
                 }
-              },
-            ),
-            const SizedBox(height: 8),
-            Card(
-              elevation: 0,
-              color: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: _addSegment,
-                child: Container(
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.add, color: Colors.white),
-                      SizedBox(width: 16),
-                      Text(
-                        'Add Segment',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 17,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
+              } catch (e) {
+                debugPrint('Segment render error: $e');
+                return Container(key: ValueKey('error_${_segments[index].id}'));
+              }
+            },
+          ),
+          const SizedBox(height: 10),
+          _editorPillButton(
+            icon: Icons.add_rounded,
+            label: 'Add Segment',
+            onTap: _addSegment,
+            color: const Color(0xFF38BDF8),
+            textColor: Colors.white,
+          ),
+          const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+
+  Widget _editorPillButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required Color color,
+    required Color textColor,
+    Color? borderColor,
+  }) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(50),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(50),
+        onTap: onTap,
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(50),
+            border: borderColor != null
+                ? Border.all(color: borderColor, width: 1.5)
+                : Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 4)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: textColor, size: 22),
+              const SizedBox(width: 10),
+              Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 15)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _segIconBtn(IconData icon, VoidCallback onTap, {Color color = const Color(0xFF1E1E2C), bool active = false}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(7),
+          child: Icon(icon, size: 20, color: active ? const Color(0xFF38BDF8) : color),
+        ),
       ),
     );
   }

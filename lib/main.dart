@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'spinning_wheel.dart';
 import 'wheel_item.dart';
 import 'wheel_config.dart';
@@ -36,14 +38,119 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // -- Design tokens --
+  static const _primary = Color(0xFF38BDF8); // bright light blue
+  static const _primaryDark = Color(0xFF0EA5E9);
+  static const _surface = Colors.white;
+  static const _onSurface = Color(0xFF1E1E2C);
+  static const _border = Color(0xFFD4D4D8);
+  static const _radius = 18.0;
+
   @override
   Widget build(BuildContext context) {
+    final textTheme = GoogleFonts.interTextTheme(
+      ThemeData.light().textTheme.copyWith(
+        headlineLarge: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _onSurface),
+        headlineMedium: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: _onSurface),
+        titleLarge: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _onSurface),
+        titleMedium: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _onSurface),
+        bodyLarge: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _onSurface),
+        bodyMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _onSurface),
+        labelLarge: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _onSurface),
+      ),
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flutter Spinning Wheel',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        textTheme: textTheme,
+        colorScheme: ColorScheme.light(
+          primary: _primary,
+          onPrimary: Colors.white,
+          secondary: _primaryDark,
+          surface: _surface,
+          onSurface: _onSurface,
+          outline: _border,
+        ),
+        scaffoldBackgroundColor: _surface,
+        cardTheme: CardThemeData(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(_radius),
+            side: const BorderSide(color: _border, width: 1.5),
+          ),
+          color: _surface,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFF4F4F5),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _border, width: 1.5),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _border, width: 1.5),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _primary, width: 2),
+          ),
+          labelStyle: TextStyle(fontWeight: FontWeight.w600, color: _onSurface.withValues(alpha: 0.6)),
+        ),
+        sliderTheme: SliderThemeData(
+          activeTrackColor: _onSurface,
+          inactiveTrackColor: _onSurface.withValues(alpha: 0.15),
+          thumbColor: _onSurface,
+          overlayColor: _onSurface.withValues(alpha: 0.10),
+          valueIndicatorColor: _onSurface,
+          trackHeight: 6,
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _onSurface,
+            side: const BorderSide(color: _border, width: 1.5),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+          ),
+        ),
+        checkboxTheme: CheckboxThemeData(
+          fillColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) return _primary;
+            return Colors.transparent;
+          }),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+          side: const BorderSide(color: _border, width: 2),
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: _onSurface,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+          elevation: 0,
+        ),
+        tabBarTheme: TabBarThemeData(
+          labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          unselectedLabelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          labelColor: _onSurface,
+          unselectedLabelColor: _onSurface.withValues(alpha: 0.45),
+          indicatorColor: _primary,
+          indicatorSize: TabBarIndicatorSize.tab,
+        ),
       ),
       home: const WheelDemo(),
     );
@@ -305,44 +412,44 @@ class _WheelDemoState extends State<WheelDemo> {
       enableDrag: true,
       isDismissible: false,
       builder: (context) => Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(
-              // ignore: deprecated_member_use
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(28, 20, 28, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
+              width: 48,
+              height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFFD4D4D8),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
-            const Icon(Icons.warning, color: Colors.orange, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Delete Wheel',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Are you sure you want to delete "${wheel.name}"?',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
             const SizedBox(height: 24),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.delete, color: Color(0xFFEF4444), size: 32),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Delete Wheel?',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '"${wheel.name}" will be gone forever.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E1E2C).withValues(alpha: 0.55)),
+            ),
+            const SizedBox(height: 28),
             Row(
               children: [
                 Expanded(
@@ -353,13 +460,22 @@ class _WheelDemoState extends State<WheelDemo> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+                  child: Material(
+                    color: const Color(0xFFEF4444),
+                    borderRadius: BorderRadius.circular(50),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(50),
+                      onTap: () => Navigator.pop(context, true),
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(50),
+                          border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 4)),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                      ),
                     ),
-                    child: const Text('Delete'),
                   ),
                 ),
               ],
@@ -435,141 +551,171 @@ class _WheelDemoState extends State<WheelDemo> {
 
   Widget _buildWheelManagerPanel() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-                const Text(
-                  'Your Wheels',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                _savedWheels.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No saved wheels yet.\nCreate your first wheel!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : ReorderableListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          buildDefaultDragHandles: false,
-                          itemCount: _savedWheels.length,
-                          onReorder: (oldIndex, newIndex) {
-                            try {
-                              _reorderSavedWheels(oldIndex, newIndex);
-                            } catch (e) {
-                              // Ignore Flutter rendering assertions during reorder
-                              debugPrint('Reorder error (safe to ignore): $e');
-                            }
-                          },
-                          itemBuilder: (context, index) {
-                            try {
-                              final wheel = _savedWheels[index];
-                              final isSelected = _currentWheel?.id == wheel.id;
-                              return ReorderableDragStartListener(
-                              key: ValueKey(wheel.id),
-                              index: index,
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? const Color.fromARGB(255, 220, 240, 255) : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border:  isSelected ? Border.all(color: Colors.blue, width: 1.5) : Border.all(color: Colors.grey, width: 1.5) ,
-                                  boxShadow: [
-                                    // Outer, softer shadow (more blurred, less opaque)
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.08),
-                                      blurRadius: 20,
-                                      spreadRadius: 0,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                    // Inner, sharper shadow (more opaque, closer)
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.15),
-                                      blurRadius: 4,
-                                      spreadRadius: 0,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: ListTile(
-                                leading: Icon(
-                                  Icons.casino,
-                                  color: isSelected ? Colors.blue : null,
-                                ),
-                                title: Text(
-                                  wheel.name,
-                                  style: TextStyle(
-                                    fontWeight: isSelected ? null : null,
-                                  ),
-                                ),
-                                subtitle: Text('${wheel.items.length} segments'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.copy),
-                                      onPressed: () => _duplicateWheel(wheel),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete),
-                                      color: Colors.red,
-                                      onPressed: () => _deleteWheel(wheel),
-                                    ),
-                                  ],
-                                ),
-                                onTap: () {
-                                  setState(() {
-                                    _currentWheel = wheel;
-                                    _previewWheel = null;
-                                    _editingWheel = null;
-                                  });
-                                },
-                              ),
-                            ),
-                            );
-                            } catch (e) {
-                              // Fallback for rendering errors
-                              debugPrint('Wheel item render error: $e');
-                              return Container(key: ValueKey('error_${_savedWheels[index].id}'));
-                            }
-                          },
-                        ),
-                const SizedBox(height: 8),
-                Card(
-                  elevation: 0,
-                  color: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: _createNewWheel,
-                    child: Container(
-                      height: 56,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.add, color: Colors.white),
-                          SizedBox(width: 16),
-                          Text(
-                            'Create New Wheel',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 17,
-                            ),
-                          ),
-                        ],
+          Text('Your Wheels', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 20),
+          _savedWheels.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Text(
+                      'No saved wheels yet.\nCreate your first wheel!',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: const Color(0xFF1E1E2C).withValues(alpha: 0.45),
                       ),
                     ),
                   ),
+                )
+              : ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: _savedWheels.length,
+                  onReorder: (oldIndex, newIndex) {
+                    try {
+                      _reorderSavedWheels(oldIndex, newIndex);
+                    } catch (e) {
+                      debugPrint('Reorder error (safe to ignore): $e');
+                    }
+                  },
+                  itemBuilder: (context, index) {
+                    try {
+                      final wheel = _savedWheels[index];
+                      final isSelected = _currentWheel?.id == wheel.id;
+                      return ReorderableDragStartListener(
+                        key: ValueKey(wheel.id),
+                        index: index,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFE0F2FE) : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.casino_rounded,
+                                color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
+                                size: 22,
+                              ),
+                            ),
+                            title: Text(
+                              wheel.name,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                            ),
+                            subtitle: Text(
+                              '${wheel.items.length} segments',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                                color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _iconBtn(Icons.copy_rounded, () => _duplicateWheel(wheel)),
+                                const SizedBox(width: 2),
+                                _iconBtn(Icons.delete_rounded, () => _deleteWheel(wheel), color: const Color(0xFFEF4444)),
+                              ],
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _currentWheel = wheel;
+                                _previewWheel = null;
+                                _editingWheel = null;
+                              });
+                            },
+                          ),
+                        ),
+                      );
+                    } catch (e) {
+                      debugPrint('Wheel item render error: $e');
+                      return Container(key: ValueKey('error_${_savedWheels[index].id}'));
+                    }
+                  },
                 ),
-              ],
+          const SizedBox(height: 10),
+          _chunkyButton(
+            icon: Icons.add_rounded,
+            label: 'Create New Wheel',
+            onTap: _createNewWheel,
+            color: const Color(0xFF38BDF8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Reusable chunky pill button
+  Widget _chunkyButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color color = const Color(0xFF1E1E2C),
+  }) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(50),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(50),
+        onTap: onTap,
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(50),
+            border: Border(
+              bottom: BorderSide(color: Colors.black.withValues(alpha: 0.25), width: 4),
             ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Small icon button helper
+  Widget _iconBtn(IconData icon, VoidCallback onTap, {Color color = const Color(0xFF1E1E2C)}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 20, color: color),
+        ),
+      ),
     );
   }
 
@@ -584,54 +730,32 @@ class _WheelDemoState extends State<WheelDemo> {
     return Scaffold(
       body: Row(
         children: [
-          // Left sidebar with controls
+          // Left sidebar
           Container(
             width: 400,
-            color: Colors.white,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5)),
+            ),
             child: Column(
               children: [
-                // Navigation buttons
+                // Nav tabs
                 if (_leftPanelView != 'new_wheel')
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _leftPanelView == 'manager' ? null : _openWheelManager,
-                            icon: const Icon(Icons.list),
-                            label: const Text('Wheels'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _leftPanelView == 'manager'
-                                  ? Theme.of(context).colorScheme.primary
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _currentWheel == null || _leftPanelView == 'current_wheel' ? null : _openCurrentWheelEditor,
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Current Wheel'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _leftPanelView == 'current_wheel'
-                                  ? Theme.of(context).colorScheme.primary
-                                  : null,
-                            ),
-                          ),
-                        ),
+                        Expanded(child: _navTab('Wheels', Icons.view_list_rounded, _leftPanelView == 'manager', _leftPanelView == 'manager' ? null : _openWheelManager)),
+                        const SizedBox(width: 10),
+                        Expanded(child: _navTab('Editor', Icons.edit_rounded, _leftPanelView == 'current_wheel', _currentWheel == null || _leftPanelView == 'current_wheel' ? null : _openCurrentWheelEditor)),
                       ],
                     ),
                   ),
-                // Content area
-                Expanded(
-                  child: _buildLeftPanel(),
-                ),
+                Expanded(child: _buildLeftPanel()),
               ],
             ),
           ),
-          // Right side with wheel
+          // Right side — wheel area
           Expanded(
             child: Container(
               color: _backgroundColor,
@@ -661,86 +785,76 @@ class _WheelDemoState extends State<WheelDemo> {
                           showWinAnimation: _showWinAnimation,
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      // Spin controls in one row
+                      const SizedBox(height: 28),
+                      // Spin controls bar
                       Container(
                         width: 700,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(50),
+                          border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            IconButton(
-                              onPressed: () => _wheelKey.currentState?.reset(),
-                              icon: const Icon(Icons.restart_alt),
-                              iconSize: 32,
-                              tooltip: 'Reset wheel position',
-                            ),
+                            _iconBtn(Icons.restart_alt_rounded, () => _wheelKey.currentState?.reset()),
                             const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => _wheelKey.currentState?.spin(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
-                                textStyle: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                                elevation: 0,
+                            // Big SPIN pill button
+                            Material(
+                              color: const Color(0xFF38BDF8),
+                              borderRadius: BorderRadius.circular(50),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(50),
+                                onTap: () => _wheelKey.currentState?.spin(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 18),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(50),
+                                    border: const Border(
+                                      bottom: BorderSide(color: Color(0xFF0EA5E9), width: 4),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'SPIN',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                ),
                               ),
-                              child: const Text('SPIN', style: TextStyle(color: Colors.white)),
                             ),
                             const SizedBox(width: 16),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _isRandomIntensity,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _isRandomIntensity = value ?? true;
-                                    });
-                                  },
-                                ),
-                                const Text('Random'),
-                              ],
-                            ),
+                            _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
                             const SizedBox(width: 8),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _showWinAnimation,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _showWinAnimation = value ?? true;
-                                    });
-                                  },
-                                ),
-                                const Text('Win Animation'),
-                              ],
-                            ),
+                            _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
                             if (!_isRandomIntensity) ...[
-                              const SizedBox(width: 16),
-                              const Text('Intensity: '),
+                              const SizedBox(width: 12),
                               SizedBox(
-                                width: 200,
+                                width: 140,
                                 child: Slider(
                                   value: _spinIntensity,
                                   min: 0.0,
                                   max: 1.0,
                                   divisions: 20,
                                   label: '${(_spinIntensity * 100).round()}%',
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _spinIntensity = value;
-                                    });
-                                  },
+                                  onChanged: (value) => setState(() => _spinIntensity = value),
                                 ),
                               ),
-                              Text('${(_spinIntensity * 100).round()}%'),
+                              Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                             ],
                           ],
                         ),
                       ),
                     ] else
-                      const Text(
+                      Text(
                         'No wheel selected',
-                        style: TextStyle(fontSize: 24, color: Colors.grey),
+                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
+                        ),
                       ),
                   ],
                 ),
@@ -752,9 +866,66 @@ class _WheelDemoState extends State<WheelDemo> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(right: 16, bottom: 16),
         child: FloatingActionButton(
-          backgroundColor: Colors.black,
           onPressed: _openColorPickerBottomSheet,
-          child: const Icon(Icons.color_lens, color: Colors.white),
+          child: const Icon(Icons.palette_rounded),
+        ),
+      ),
+    );
+  }
+
+  // Nav tab pill
+  Widget _navTab(String label, IconData icon, bool active, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 46,
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
+          borderRadius: BorderRadius.circular(50),
+          border: active ? null : Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: active ? Colors.white : const Color(0xFF1E1E2C).withValues(alpha: 0.6)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: active ? Colors.white : const Color(0xFF1E1E2C).withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Chip toggle for spin controls
+  Widget _chipToggle(String label, bool value, ValueChanged<bool> onChanged) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: value ? const Color(0xFF38BDF8).withValues(alpha: 0.15) : const Color(0xFFF4F4F5),
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(
+            color: value ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: value ? const Color(0xFF0EA5E9) : const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+          ),
         ),
       ),
     );
@@ -824,158 +995,76 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
+          const SizedBox(height: 14),
           Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 16, bottom: 8),
+            width: 48,
+            height: 5,
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+              color: const Color(0xFFD4D4D8),
+              borderRadius: BorderRadius.circular(3),
             ),
           ),
-          // Tab bar
+          const SizedBox(height: 8),
           TabBar(
             controller: _tabController,
             tabs: const [
               Tab(text: 'Background'),
               Tab(text: 'Header Text'),
-              Tab(text: 'Winner Overlay'),
+              Tab(text: 'Overlay'),
             ],
-            labelColor: Colors.black,
-            indicatorSize: TabBarIndicatorSize.tab,
           ),
-          // Tab views
           SizedBox(
             height: 450,
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Background color picker
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      ColorPicker(
-                        color: widget.backgroundColor,
-                        onColorChanged: widget.onBackgroundColorChanged,
-                        wheelDiameter: 280,
-                        wheelWidth: 28,
-                        enableShadesSelection: false,
-                        pickersEnabled: const <ColorPickerType, bool>{
-                          ColorPickerType.both: false,
-                          ColorPickerType.primary: false,
-                          ColorPickerType.accent: false,
-                          ColorPickerType.wheel: true,
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _bgHexController,
-                        decoration: const InputDecoration(
-                          labelText: 'Hex',
-                          border: OutlineInputBorder(),
-                          prefixText: '',
-                        ),
-                        maxLength: 6,
-                        onSubmitted: (value) {
-                          final c = _hexToColor(value);
-                          if (c != null) widget.onBackgroundColorChanged(c);
-                        },
-                      ),
-                      const Spacer(),
-                    ],
-                  ),
-                ),
-                // Text color picker
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      ColorPicker(
-                        color: widget.textColor,
-                        onColorChanged: widget.onTextColorChanged,
-                        wheelDiameter: 280,
-                        wheelWidth: 28,
-                        enableShadesSelection: false,
-                        pickersEnabled: const <ColorPickerType, bool>{
-                          ColorPickerType.both: false,
-                          ColorPickerType.primary: false,
-                          ColorPickerType.accent: false,
-                          ColorPickerType.wheel: true,
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _textHexController,
-                        decoration: const InputDecoration(
-                          labelText: 'Hex',
-                          border: OutlineInputBorder(),
-                          prefixText: '',
-                        ),
-                        maxLength: 6,
-                        onSubmitted: (value) {
-                          final c = _hexToColor(value);
-                          if (c != null) widget.onTextColorChanged(c);
-                        },
-                      ),
-                      const Spacer(),
-                    ],
-                  ),
-                ),
-                // Overlay color picker
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      ColorPicker(
-                        color: widget.overlayColor,
-                        onColorChanged: widget.onOverlayColorChanged,
-                        wheelDiameter: 280,
-                        wheelWidth: 28,
-                        enableShadesSelection: false,
-                        pickersEnabled: const <ColorPickerType, bool>{
-                          ColorPickerType.both: false,
-                          ColorPickerType.primary: false,
-                          ColorPickerType.accent: false,
-                          ColorPickerType.wheel: true,
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _overlayHexController,
-                        decoration: const InputDecoration(
-                          labelText: 'Hex',
-                          border: OutlineInputBorder(),
-                          prefixText: '',
-                        ),
-                        maxLength: 6,
-                        onSubmitted: (value) {
-                          final c = _hexToColor(value);
-                          if (c != null) widget.onOverlayColorChanged(c);
-                        },
-                      ),
-                      const Spacer(),
-                    ],
-                  ),
-                ),
+                _colorTab(widget.backgroundColor, widget.onBackgroundColorChanged, _bgHexController),
+                _colorTab(widget.textColor, widget.onTextColorChanged, _textHexController),
+                _colorTab(widget.overlayColor, widget.onOverlayColorChanged, _overlayHexController),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colorTab(Color color, ValueChanged<Color> onChanged, TextEditingController hexController) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
+      child: Column(
+        children: [
+          ColorPicker(
+            color: color,
+            onColorChanged: onChanged,
+            wheelDiameter: 280,
+            wheelWidth: 28,
+            enableShadesSelection: false,
+            pickersEnabled: const <ColorPickerType, bool>{
+              ColorPickerType.both: false,
+              ColorPickerType.primary: false,
+              ColorPickerType.accent: false,
+              ColorPickerType.wheel: true,
+            },
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: hexController,
+            maxLength: 6,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+            onSubmitted: (value) {
+              final c = _hexToColor(value);
+              if (c != null) onChanged(c);
+            },
+          ),
+          const Spacer(),
         ],
       ),
     );
