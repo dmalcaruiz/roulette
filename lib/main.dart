@@ -1,14 +1,17 @@
 import 'dart:async';
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:snapping_sheet/snapping_sheet.dart';
 import 'spinning_wheel.dart';
 import 'wheel_item.dart';
 import 'wheel_config.dart';
 import 'wheel_manager.dart';
 import 'wheel_editor.dart';
+import 'push_down_button.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -185,6 +188,11 @@ class _WheelDemoState extends State<WheelDemo> {
   bool _showWinAnimation = true;
   final GlobalKey<SpinningWheelState> _wheelKey = GlobalKey<SpinningWheelState>();
 
+  // Snapping sheet controls (mobile)
+  final SnappingSheetController _snappingSheetController = SnappingSheetController();
+  final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
+  static const double _grabbingHeight = 70.0;
+
   // Preset templates (mutable for reordering)
   final List<WheelConfig> _presets = [
     WheelConfig(
@@ -241,6 +249,7 @@ class _WheelDemoState extends State<WheelDemo> {
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
+    _currentSheetHeight.dispose();
     super.dispose();
   }
 
@@ -454,28 +463,25 @@ class _WheelDemoState extends State<WheelDemo> {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
+                  child: PushDownButton(
+                    color: const Color(0xFFF4F4F5),
+                    onTap: () => Navigator.pop(context, false),
+                    height: 56,
+                    bottomBorderColor: const Color(0xFFD4D4D8),
+                    child: const Center(
+                      child: Text('Cancel', style: TextStyle(color: Color(0xFF1E1E2C), fontWeight: FontWeight.w700, fontSize: 16)),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Material(
+                  child: PushDownButton(
                     color: const Color(0xFFEF4444),
-                    borderRadius: BorderRadius.circular(50),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(50),
-                      onTap: () => Navigator.pop(context, true),
-                      child: Container(
-                        height: 50,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(50),
-                          border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 4)),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                      ),
+                    onTap: () => Navigator.pop(context, true),
+                    height: 56,
+                    bottomBorderColor: const Color(0xFFDC2626),
+                    child: const Center(
+                      child: Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
                   ),
                 ),
@@ -589,7 +595,7 @@ class _WheelDemoState extends State<WheelDemo> {
                   itemCount: _savedWheels.length,
                   proxyDecorator: (child, index, animation) {
                     return Transform.scale(
-                      scale: 1.05,
+                      scale: 1.1,
                       child: child,
                     );
                   },
@@ -718,36 +724,27 @@ class _WheelDemoState extends State<WheelDemo> {
     required VoidCallback onTap,
     Color color = const Color(0xFF1E1E2C),
   }) {
-    return Material(
+    return PushDownButton(
       color: color,
-      borderRadius: BorderRadius.circular(50),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(50),
-        onTap: onTap,
-        child: Container(
-          height: 54,
-          padding: const EdgeInsets.symmetric(horizontal: 22),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(50),
-            border: Border(
-              bottom: BorderSide(color: Colors.black.withValues(alpha: 0.25), width: 4),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: Colors.white, size: 22),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
+      onTap: onTap,
+      height: 58,
+      bottomBorderColor: const Color(0xFF0EA5E9),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -768,6 +765,48 @@ class _WheelDemoState extends State<WheelDemo> {
     );
   }
 
+  Widget _buildGrabbingHandle() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+          left: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+          right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          // Drag indicator bar
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD4D4D8),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Nav tab chips
+          if (_leftPanelView != 'new_wheel')
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(child: _navTab('Wheels', LucideIcons.list, _leftPanelView == 'manager', _leftPanelView == 'manager' ? null : _openWheelManager)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _navTab('Editor', LucideIcons.pencil, _leftPanelView == 'current_wheel', _currentWheel == null || _leftPanelView == 'current_wheel' ? null : _openCurrentWheelEditor)),
+                ],
+              ),
+            ),
+          const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -776,6 +815,232 @@ class _WheelDemoState extends State<WheelDemo> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 900;
+
+    // Ideal wheel size
+    const double idealWheelSize = 700;
+
+    // Calculate scale for both layouts
+    final availableWidth = isMobile ? (screenWidth - 16) : (screenWidth - 400 - 32);
+    final effectiveWheelSize = availableWidth < idealWheelSize ? availableWidth : idealWheelSize;
+    final wheelScale = effectiveWheelSize / idealWheelSize;
+
+    if (isMobile) {
+      // Mobile layout: SnappingSheet with dynamic wheel resizing
+      final screenHeight = MediaQuery.of(context).size.height;
+      final safeTop = MediaQuery.of(context).padding.top;
+      final safeBottom = MediaQuery.of(context).padding.bottom;
+
+      return Scaffold(
+        body: Container(
+          color: _backgroundColor,
+          child: Stack(
+            children: [
+              SnappingSheet(
+                controller: _snappingSheetController,
+                lockOverflowDrag: true,
+                snappingPositions: const [
+                  SnappingPosition.pixels(
+                    positionPixels: 6,
+                    snappingCurve: Curves.easeOutExpo,
+                    snappingDuration: Duration(milliseconds: 900),
+                    grabbingContentOffset: GrabbingContentOffset.top,
+                  ),
+                  SnappingPosition.pixels(
+                    positionPixels: 350,
+                    snappingCurve: Curves.easeOutExpo,
+                    snappingDuration: Duration(milliseconds: 900),
+                  ),
+                ],
+                onSheetMoved: (positionData) {
+                  _currentSheetHeight.value = positionData.pixels;
+                },
+                grabbingHeight: _grabbingHeight,
+                grabbing: _buildGrabbingHandle(),
+                sheetBelow: SnappingSheetContent(
+                  draggable: true,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        left: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                        right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(child: _buildLeftPanel()),
+                      ],
+                    ),
+                  ),
+                ),
+                // Main content above the sheet
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      // Dynamic wheel area that resizes with sheet
+                      ValueListenableBuilder<double>(
+                        valueListenable: _currentSheetHeight,
+                        builder: (context, sheetHeight, _) {
+                          final availableHeight = screenHeight - safeTop - safeBottom - sheetHeight - _grabbingHeight;
+                          final maxWheelSize = min(availableHeight - 130, effectiveWheelSize);
+                          final clampedWheelSize = maxWheelSize.clamp(80.0, effectiveWheelSize);
+                          final dynamicWheelScale = clampedWheelSize / idealWheelSize;
+
+                          return Container(
+                            height: availableHeight.clamp(200.0, screenHeight),
+                            color: Colors.transparent,
+                            child: Center(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (_previewWheel != null || _currentWheel != null) ...[
+                                      const SizedBox(height: 10),
+                                      RepaintBoundary(
+                                        child: SpinningWheel(
+                                          key: _wheelKey,
+                                          items: (_previewWheel ?? _currentWheel)!.items,
+                                          onFinished: _onWheelFinished,
+                                          size: clampedWheelSize,
+                                          textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize * dynamicWheelScale,
+                                          headerTextSizeMultiplier: (_previewWheel ?? _currentWheel)!.headerTextSize * dynamicWheelScale,
+                                          imageSize: (_previewWheel ?? _currentWheel)!.imageSize * dynamicWheelScale,
+                                          cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius * dynamicWheelScale,
+                                          strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth * dynamicWheelScale,
+                                          showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
+                                          centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize * dynamicWheelScale,
+                                          spinIntensity: _spinIntensity,
+                                          isRandomIntensity: _isRandomIntensity,
+                                          headerTextColor: _textColor,
+                                          overlayColor: _overlayColor,
+                                          showWinAnimation: _showWinAnimation,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      // Compact spin controls
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        child: Column(
+                                          children: [
+                                            Row(
+                                              children: [
+                                                PushDownButton(
+                                                  color: const Color(0xFFAE01CB),
+                                                  onTap: () => _wheelKey.currentState?.reset(),
+                                                  height: 64,
+                                                  bottomBorderColor: const Color(0xFF8A009F),
+                                                  child: const SizedBox(
+                                                    width: 59,
+                                                    child: Center(
+                                                      child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: PushDownButton(
+                                                    color: const Color(0xFF38BDF8),
+                                                    onTap: () => _wheelKey.currentState?.spin(),
+                                                    height: 64,
+                                                    bottomBorderColor: const Color(0xFF0EA5E9),
+                                                    child: const Center(
+                                                      child: Text(
+                                                        'SPIN',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 24,
+                                                          fontWeight: FontWeight.w800,
+                                                          letterSpacing: 2,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
+                                                const SizedBox(width: 8),
+                                                _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
+                                              ],
+                                            ),
+                                            if (!_isRandomIntensity) ...[
+                                              const SizedBox(height: 8),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Slider(
+                                                      value: _spinIntensity,
+                                                      min: 0.0,
+                                                      max: 1.0,
+                                                      divisions: 20,
+                                                      label: '${(_spinIntensity * 100).round()}%',
+                                                      onChanged: (value) => setState(() => _spinIntensity = value),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                                ],
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                    ] else
+                                      Text(
+                                        'No wheel selected',
+                                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Color picker button floating at bottom-right
+              Positioned(
+                bottom: safeBottom + 12,
+                right: 16,
+                child: Material(
+                  color: const Color(0xFF1E1E2C),
+                  borderRadius: BorderRadius.circular(50),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(50),
+                    onTap: _openColorPickerBottomSheet,
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border(
+                          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.25), width: 4),
+                        ),
+                      ),
+                      child: const Icon(LucideIcons.palette, color: Colors.white, size: 22),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Desktop layout: side-by-side
     return Scaffold(
       body: Row(
         children: [
@@ -810,102 +1075,123 @@ class _WheelDemoState extends State<WheelDemo> {
               color: _backgroundColor,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_previewWheel != null || _currentWheel != null) ...[
-                      RepaintBoundary(
-                        child: SpinningWheel(
-                          key: _wheelKey,
-                          items: (_previewWheel ?? _currentWheel)!.items,
-                          onFinished: _onWheelFinished,
-                          size: 700,
-                          textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize,
-                          headerTextSizeMultiplier: (_previewWheel ?? _currentWheel)!.headerTextSize,
-                          imageSize: (_previewWheel ?? _currentWheel)!.imageSize,
-                          cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius,
-                          strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth,
-                          showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
-                          centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize,
-                          spinIntensity: _spinIntensity,
-                          isRandomIntensity: _isRandomIntensity,
-                          headerTextColor: _textColor,
-                          overlayColor: _overlayColor,
-                          showWinAnimation: _showWinAnimation,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 20),
+                      if (_previewWheel != null || _currentWheel != null) ...[
+                        RepaintBoundary(
+                          child: SpinningWheel(
+                            key: _wheelKey,
+                            items: (_previewWheel ?? _currentWheel)!.items,
+                            onFinished: _onWheelFinished,
+                            size: effectiveWheelSize,
+                            textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize * wheelScale,
+                            headerTextSizeMultiplier: (_previewWheel ?? _currentWheel)!.headerTextSize * wheelScale,
+                            imageSize: (_previewWheel ?? _currentWheel)!.imageSize * wheelScale,
+                            cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius * wheelScale,
+                            strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth * wheelScale,
+                            showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
+                            centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize * wheelScale,
+                            spinIntensity: _spinIntensity,
+                            isRandomIntensity: _isRandomIntensity,
+                            headerTextColor: _textColor,
+                            overlayColor: _overlayColor,
+                            showWinAnimation: _showWinAnimation,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 28),
-                      // Spin controls bar
-                      Container(
-                        width: 700,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(50),
-                          border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _iconBtn(LucideIcons.rotateCcw, () => _wheelKey.currentState?.reset()),
-                            const SizedBox(width: 8),
-                            // Big SPIN pill button
-                            Material(
-                              color: const Color(0xFF38BDF8),
+                        const SizedBox(height: 28),
+                        // Spin controls bar
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: effectiveWheelSize),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(50),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(50),
-                                onTap: () => _wheelKey.currentState?.spin(),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 18),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(50),
-                                    border: const Border(
-                                      bottom: BorderSide(color: Color(0xFF0EA5E9), width: 4),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'SPIN',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                              border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
                             ),
-                            const SizedBox(width: 16),
-                            _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
-                            const SizedBox(width: 8),
-                            _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
-                            if (!_isRandomIntensity) ...[
-                              const SizedBox(width: 12),
-                              SizedBox(
-                                width: 140,
-                                child: Slider(
-                                  value: _spinIntensity,
-                                  min: 0.0,
-                                  max: 1.0,
-                                  divisions: 20,
-                                  label: '${(_spinIntensity * 100).round()}%',
-                                  onChanged: (value) => setState(() => _spinIntensity = value),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    PushDownButton(
+                                      color: const Color(0xFFAE01CB),
+                                      onTap: () => _wheelKey.currentState?.reset(),
+                                      height: 64,
+                                      bottomBorderColor: const Color(0xFF8A009F),
+                                      child: const SizedBox(
+                                        width: 59,
+                                        child: Center(
+                                          child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    // Big SPIN pill button
+                                    PushDownButton(
+                                      color: const Color(0xFF38BDF8),
+                                      onTap: () => _wheelKey.currentState?.spin(),
+                                      height: 64,
+                                      bottomBorderColor: const Color(0xFF0EA5E9),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 52),
+                                        child: Center(
+                                          child: Text(
+                                            'SPIN',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                            ],
-                          ],
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
+                                    _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
+                                    if (!_isRandomIntensity) ...[
+                                      SizedBox(
+                                        width: 140,
+                                        child: Slider(
+                                          value: _spinIntensity,
+                                          min: 0.0,
+                                          max: 1.0,
+                                          divisions: 20,
+                                          label: '${(_spinIntensity * 100).round()}%',
+                                          onChanged: (value) => setState(() => _spinIntensity = value),
+                                        ),
+                                      ),
+                                      Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ] else
-                      Text(
-                        'No wheel selected',
-                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
+                        const SizedBox(height: 20),
+                      ] else
+                        Text(
+                          'No wheel selected',
+                          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

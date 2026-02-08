@@ -16,6 +16,7 @@ class WheelPainter extends CustomPainter {
   final double overlayOpacity;
   final int winningIndex;
   final Color overlayColor;
+  final double textVerticalOffset;
 
   WheelPainter({
     required this.items,
@@ -29,6 +30,7 @@ class WheelPainter extends CustomPainter {
     this.overlayOpacity = 0.0,
     this.winningIndex = -1,
     this.overlayColor = Colors.black,
+    this.textVerticalOffset = 0.0,
   });
 
   @override
@@ -227,15 +229,15 @@ class WheelPainter extends CustomPainter {
         ),
         textAlign: TextAlign.right,
         textDirection: TextDirection.ltr,
-        maxLines: 2,
+        maxLines: 1,
         ellipsis: '\u2026',
       );
 
       textPainter.layout(maxWidth: maxTextWidth > 0 ? maxTextWidth : 1);
 
       final textOffset = hasVisual
-          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2)
-          : Offset(radius - textPainter.width - 20, -textPainter.height / 2);
+          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2 - textVerticalOffset)
+          : Offset(radius - textPainter.width - 20, -textPainter.height / 2 - textVerticalOffset);
 
       textPainter.paint(canvas, textOffset);
 
@@ -248,7 +250,7 @@ class WheelPainter extends CustomPainter {
     if (overlayOpacity > 0 && winningIndex >= 0 && winningIndex < items.length) {
       // Draw a single uniform circular overlay covering everything
       // Extend radius to cover the stroke (stroke extends strokeWidth/2 beyond the radius)
-      final overlayRadius = showBackgroundCircle ? radius + (strokeWidth / 2) : radius;
+      final overlayRadius = showBackgroundCircle ? radius + (strokeWidth / 2) + 0.5 : radius + 0.5;
       canvas.drawCircle(
         center,
         overlayRadius,
@@ -411,15 +413,15 @@ class WheelPainter extends CustomPainter {
         ),
         textAlign: TextAlign.right,
         textDirection: TextDirection.ltr,
-        maxLines: 2,
+        maxLines: 1,
         ellipsis: '\u2026',
       );
 
       textPainter.layout(maxWidth: maxTextWidth > 0 ? maxTextWidth : 1);
 
       final textOffset = hasVisual
-          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2)
-          : Offset(radius - textPainter.width - 20, -textPainter.height / 2);
+          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2 - textVerticalOffset)
+          : Offset(radius - textPainter.width - 20, -textPainter.height / 2 - textVerticalOffset);
 
       textPainter.paint(canvas, textOffset);
 
@@ -446,6 +448,7 @@ class WheelPainter extends CustomPainter {
            oldDelegate.overlayOpacity != overlayOpacity ||
            oldDelegate.winningIndex != winningIndex ||
            oldDelegate.overlayColor != overlayColor ||
+           oldDelegate.textVerticalOffset != textVerticalOffset ||
            imageCacheChanged;
   }
 }

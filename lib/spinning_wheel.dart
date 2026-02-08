@@ -545,6 +545,7 @@ class SpinningWheelState extends State<SpinningWheel>
                     overlayOpacity: _overlayOpacity,
                     winningIndex: _winningIndex,
                     overlayColor: widget.overlayColor,
+                    textVerticalOffset: widget.size / 700 * 2, // 2px at 700px, scales proportionally
                   ),
                 ),
               ),

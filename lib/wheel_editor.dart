@@ -8,6 +8,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'wheel_config.dart';
 import 'wheel_item.dart';
 import 'icon_map.dart';
+import 'push_down_button.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -503,7 +504,7 @@ class _WheelEditorState extends State<WheelEditor> {
             itemCount: _segments.length,
             proxyDecorator: (child, index, animation) {
               return Transform.scale(
-                scale: 1.05,
+                scale: 1.1,
                 child: Material(
                   color: Colors.transparent,
                   child: child,
@@ -802,31 +803,41 @@ class _WheelEditorState extends State<WheelEditor> {
     required Color textColor,
     Color? borderColor,
   }) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(50),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(50),
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: textColor, size: 22),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 15)),
+        ],
+      ),
+    );
+
+    if (borderColor != null) {
+      // Flat style (e.g. Wheel Settings) — no push-down effect
+      return GestureDetector(
         onTap: onTap,
         child: Container(
           height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
+            color: color,
             borderRadius: BorderRadius.circular(50),
-            border: borderColor != null
-                ? Border.all(color: borderColor, width: 1.5)
-                : Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 4)),
+            border: Border.all(color: borderColor, width: 1.5),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: textColor, size: 22),
-              const SizedBox(width: 10),
-              Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 15)),
-            ],
-          ),
+          child: child,
         ),
-      ),
+      );
+    }
+
+    // Chunky style (e.g. Add Segment) — push-down effect
+    return PushDownButton(
+      color: color,
+      onTap: onTap,
+      height: 56,
+      bottomBorderColor: const Color(0xFF0EA5E9),
+      child: child,
     );
   }
 
@@ -1074,29 +1085,20 @@ class _VisualConfigSheetState extends State<_VisualConfigSheet>
     required Color textColor,
     Color? borderColor,
   }) {
-    return Material(
+    return PushDownButton(
       color: color,
-      borderRadius: BorderRadius.circular(50),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(50),
-        onTap: onTap,
-        child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(50),
-            border: borderColor != null
-                ? Border.all(color: borderColor, width: 1.5)
-                : Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 4)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: textColor, size: 22),
-              const SizedBox(width: 10),
-              Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 15)),
-            ],
-          ),
+      onTap: onTap,
+      height: 56,
+      bottomBorderColor: borderColor ?? Colors.black.withValues(alpha: 0.2),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: textColor, size: 22),
+            const SizedBox(width: 10),
+            Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 15)),
+          ],
         ),
       ),
     );
