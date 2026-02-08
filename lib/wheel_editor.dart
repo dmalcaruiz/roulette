@@ -502,7 +502,13 @@ class _WheelEditorState extends State<WheelEditor> {
             buildDefaultDragHandles: false,
             itemCount: _segments.length,
             proxyDecorator: (child, index, animation) {
-              return child;
+              return Transform.scale(
+                scale: 1.05,
+                child: Material(
+                  color: Colors.transparent,
+                  child: child,
+                ),
+              );
             },
             onReorder: (oldIndex, newIndex) {
               try {
@@ -523,7 +529,7 @@ class _WheelEditorState extends State<WheelEditor> {
                       border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -551,6 +557,9 @@ class _WheelEditorState extends State<WheelEditor> {
                                       return TextField(
                                         controller: _segmentTextControllers[segment.id],
                                         style: const TextStyle(fontWeight: FontWeight.w600),
+                                        decoration: const InputDecoration(
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        ),
                                         enableInteractiveSelection: _editingColorIndex != null || true,
                                         onChanged: (value) {
                                           try {
@@ -754,7 +763,7 @@ class _WheelEditorState extends State<WheelEditor> {
                 );
 
                 if (_editingColorIndex == null) {
-                  return ReorderableDragStartListener(
+                  return ReorderableDelayedDragStartListener(
                     key: ValueKey(segment.id),
                     index: index,
                     child: itemContent,

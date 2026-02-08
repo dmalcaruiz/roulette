@@ -588,7 +588,10 @@ class _WheelDemoState extends State<WheelDemo> {
                   buildDefaultDragHandles: false,
                   itemCount: _savedWheels.length,
                   proxyDecorator: (child, index, animation) {
-                    return child;
+                    return Transform.scale(
+                      scale: 1.05,
+                      child: child,
+                    );
                   },
                   onReorder: (oldIndex, newIndex) {
                     try {
@@ -614,44 +617,7 @@ class _WheelDemoState extends State<WheelDemo> {
                               width: 1.5,
                             ),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                LucideIcons.dices,
-                                color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
-                                size: 22,
-                                weight: 5.5,
-                              ),
-                            ),
-                            title: Text(
-                              wheel.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                            ),
-                            subtitle: Text(
-                              '${wheel.items.length} segments',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 13,
-                                color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _iconBtn(LucideIcons.copy, () => _duplicateWheel(wheel)),
-                                const SizedBox(width: 2),
-                                _iconBtn(LucideIcons.trash2, () => _deleteWheel(wheel), color: const Color(0xFFEF4444)),
-                              ],
-                            ),
+                          child: GestureDetector(
                             onTap: () {
                               setState(() {
                                 _currentWheel = wheel;
@@ -659,12 +625,65 @@ class _WheelDemoState extends State<WheelDemo> {
                                 _editingWheel = null;
                               });
                             },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      LucideIcons.dices,
+                                      color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
+                                      size: 22,
+                                      weight: 5.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          wheel.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${wheel.items.length} segments',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 13,
+                                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _iconBtn(LucideIcons.copy, () => _duplicateWheel(wheel)),
+                                      const SizedBox(width: 2),
+                                      _iconBtn(LucideIcons.trash2, () => _deleteWheel(wheel), color: const Color(0xFFEF4444)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       );
 
-                      return ReorderableDragStartListener(
+                      return ReorderableDelayedDragStartListener(
                         key: ValueKey(wheel.id),
                         index: index,
                         child: Column(
