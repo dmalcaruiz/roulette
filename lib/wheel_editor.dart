@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
@@ -6,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'wheel_config.dart';
 import 'wheel_item.dart';
+import 'icon_map.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -78,6 +80,7 @@ class _WheelEditorState extends State<WheelEditor> {
           color: item.color,
           weight: item.weight,
           imagePath: item.imagePath,
+          iconName: item.iconName,
         );
         _weightControllers[id] = TextEditingController(text: item.weight.toStringAsFixed(1));
         _segmentTextControllers[id] = TextEditingController(text: item.text);
@@ -272,32 +275,43 @@ class _WheelEditorState extends State<WheelEditor> {
     });
   }
 
-  Future<void> _pickImage(int index) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-      );
-
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        if (file.path != null) {
+  void _openVisualConfigSheet(int index) {
+    final segment = _segments[index];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _VisualConfigSheet(
+        imagePath: segment.imagePath,
+        iconName: segment.iconName,
+        onImagePicked: (path) {
           setState(() {
-            _segments[index].imagePath = file.path;
+            _segments[index].imagePath = path;
+            _segments[index].iconName = null;
           });
           _updatePreview(immediate: true);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error picking image: $e');
-    }
-  }
-
-  void _removeImage(int index) {
-    setState(() {
-      _segments[index].imagePath = null;
-    });
-    _updatePreview(immediate: true);
+        },
+        onImageRemoved: () {
+          setState(() {
+            _segments[index].imagePath = null;
+          });
+          _updatePreview(immediate: true);
+        },
+        onIconSelected: (name) {
+          setState(() {
+            _segments[index].iconName = name;
+            _segments[index].imagePath = null;
+          });
+          _updatePreview(immediate: true);
+        },
+        onIconRemoved: () {
+          setState(() {
+            _segments[index].iconName = null;
+          });
+          _updatePreview(immediate: true);
+        },
+      ),
+    );
   }
 
   void _updatePreview({bool immediate = false}) {
@@ -326,6 +340,7 @@ class _WheelEditorState extends State<WheelEditor> {
         color: seg.color,
         weight: seg.weight,
         imagePath: seg.imagePath,
+        iconName: seg.iconName,
       )).toList(),
       textSize: _textSize,
       headerTextSize: _headerTextSize,
@@ -422,7 +437,7 @@ class _WheelEditorState extends State<WheelEditor> {
                   ),
                   child: Row(
                     children: [
-                      Icon(_showBackgroundCircle ? Icons.check_circle_rounded : Icons.circle_outlined, color: _showBackgroundCircle ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8), size: 22),
+                      Icon(_showBackgroundCircle ? LucideIcons.checkCircle : LucideIcons.circle, color: _showBackgroundCircle ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8), size: 22),
                       const SizedBox(width: 12),
                       Text('Background Circle', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _showBackgroundCircle ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.5))),
                     ],
@@ -460,7 +475,7 @@ class _WheelEditorState extends State<WheelEditor> {
         children: [
           Text(
             widget.initialConfig != null ? 'Edit Wheel' : 'Create Wheel',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 18),
           TextField(
@@ -471,7 +486,7 @@ class _WheelEditorState extends State<WheelEditor> {
           const SizedBox(height: 16),
           // Settings button — opens all sliders in a bottom sheet
           _editorPillButton(
-            icon: Icons.tune_rounded,
+            icon: LucideIcons.settings,
             label: 'Wheel Settings',
             onTap: _openSettingsSheet,
             color: const Color(0xFFF4F4F5),
@@ -486,6 +501,9 @@ class _WheelEditorState extends State<WheelEditor> {
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
             itemCount: _segments.length,
+            proxyDecorator: (child, index, animation) {
+              return child;
+            },
             onReorder: (oldIndex, newIndex) {
               try {
                 _reorderSegments(oldIndex, newIndex);
@@ -496,16 +514,17 @@ class _WheelEditorState extends State<WheelEditor> {
             itemBuilder: (context, index) {
               try {
                 final segment = _segments[index];
-                final card = Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
+                final card = ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
@@ -519,9 +538,8 @@ class _WheelEditorState extends State<WheelEditor> {
                                 decoration: BoxDecoration(
                                   color: segment.color,
                                   borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [BoxShadow(color: segment.color.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))],
                                 ),
-                                child: const Icon(Icons.palette_rounded, color: Colors.white, size: 20),
+                                child: const Icon(LucideIcons.palette, color: Colors.white, size: 20),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -553,14 +571,12 @@ class _WheelEditorState extends State<WheelEditor> {
                             ),
                             const SizedBox(width: 4),
                             _segIconBtn(
-                              segment.imagePath != null ? Icons.image_rounded : Icons.add_photo_alternate_rounded,
-                              () => _pickImage(index),
-                              active: segment.imagePath != null,
+                              segment.imagePath != null ? LucideIcons.image : segment.iconName != null ? LucideIcons.smile : LucideIcons.imagePlus,
+                              () => _openVisualConfigSheet(index),
+                              active: segment.imagePath != null || segment.iconName != null,
                             ),
-                            if (segment.imagePath != null)
-                              _segIconBtn(Icons.close_rounded, () => _removeImage(index)),
-                            _segIconBtn(Icons.copy_rounded, () => _duplicateSegment(index)),
-                            _segIconBtn(Icons.delete_rounded, () => _removeSegment(index), color: const Color(0xFFEF4444)),
+                            _segIconBtn(LucideIcons.copy, () => _duplicateSegment(index)),
+                            _segIconBtn(LucideIcons.trash2, () => _removeSegment(index), color: const Color(0xFFEF4444)),
                           ],
                         ),
                         if (_editingColorIndex == index) ...[
@@ -727,18 +743,26 @@ class _WheelEditorState extends State<WheelEditor> {
                       ],
                     ),
                   ),
+                ),
+                );
+
+                final itemContent = Column(
+                  children: [
+                    card,
+                    const SizedBox(height: 10),
+                  ],
                 );
 
                 if (_editingColorIndex == null) {
                   return ReorderableDragStartListener(
                     key: ValueKey(segment.id),
                     index: index,
-                    child: RepaintBoundary(child: card),
+                    child: itemContent,
                   );
                 } else {
                   return Container(
                     key: ValueKey(segment.id),
-                    child: RepaintBoundary(child: card),
+                    child: itemContent,
                   );
                 }
               } catch (e) {
@@ -749,7 +773,7 @@ class _WheelEditorState extends State<WheelEditor> {
           ),
           const SizedBox(height: 10),
           _editorPillButton(
-            icon: Icons.add_rounded,
+            icon: LucideIcons.plus,
             label: 'Add Segment',
             onTap: _addSegment,
             color: const Color(0xFF38BDF8),
@@ -818,6 +842,7 @@ class _SegmentData {
   Color color;
   double weight;
   String? imagePath;
+  String? iconName;
 
   _SegmentData({
     required this.id,
@@ -825,5 +850,246 @@ class _SegmentData {
     required this.color,
     required this.weight,
     this.imagePath,
+    this.iconName,
   });
+}
+
+class _VisualConfigSheet extends StatefulWidget {
+  final String? imagePath;
+  final String? iconName;
+  final ValueChanged<String> onImagePicked;
+  final VoidCallback onImageRemoved;
+  final ValueChanged<String> onIconSelected;
+  final VoidCallback onIconRemoved;
+
+  const _VisualConfigSheet({
+    required this.imagePath,
+    required this.iconName,
+    required this.onImagePicked,
+    required this.onImageRemoved,
+    required this.onIconSelected,
+    required this.onIconRemoved,
+  });
+
+  @override
+  State<_VisualConfigSheet> createState() => _VisualConfigSheetState();
+}
+
+class _VisualConfigSheetState extends State<_VisualConfigSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.iconName != null ? 1 : 0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        if (file.path != null) {
+          widget.onImagePicked(file.path!);
+          if (mounted) Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 14),
+          Container(
+            width: 48, height: 5,
+            decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(3)),
+          ),
+          const SizedBox(height: 8),
+          TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Image'),
+              Tab(text: 'Icon'),
+            ],
+          ),
+          SizedBox(
+            height: 420,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildImageTab(),
+                _buildIconTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageTab() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        children: [
+          if (widget.imagePath != null) ...[
+            Container(
+              width: 120, height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                image: DecorationImage(
+                  image: FileImage(File(widget.imagePath!)),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _sheetPillButton(
+              icon: LucideIcons.trash2,
+              label: 'Remove Image',
+              onTap: () {
+                widget.onImageRemoved();
+                Navigator.pop(context);
+              },
+              color: const Color(0xFFFEE2E2),
+              textColor: const Color(0xFFEF4444),
+              borderColor: const Color(0xFFFECACA),
+            ),
+            const SizedBox(height: 12),
+          ],
+          _sheetPillButton(
+            icon: LucideIcons.imagePlus,
+            label: widget.imagePath != null ? 'Change Image' : 'Choose Image',
+            onTap: _pickImage,
+            color: const Color(0xFFF4F4F5),
+            textColor: const Color(0xFF1E1E2C),
+            borderColor: const Color(0xFFD4D4D8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIconTab() {
+    final iconEntries = lucideIconMap.entries.toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        children: [
+          if (widget.iconName != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _sheetPillButton(
+                icon: LucideIcons.trash2,
+                label: 'Remove Icon',
+                onTap: () {
+                  widget.onIconRemoved();
+                  Navigator.pop(context);
+                },
+                color: const Color(0xFFFEE2E2),
+                textColor: const Color(0xFFEF4444),
+                borderColor: const Color(0xFFFECACA),
+              ),
+            ),
+          Expanded(
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+              ),
+              itemCount: iconEntries.length,
+              itemBuilder: (context, index) {
+                final entry = iconEntries[index];
+                final isSelected = widget.iconName == entry.key;
+                return GestureDetector(
+                  onTap: () {
+                    widget.onIconSelected(entry.key);
+                    Navigator.pop(context);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF38BDF8).withValues(alpha: 0.15) : const Color(0xFFF4F4F5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      entry.value,
+                      size: 24,
+                      color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF1E1E2C),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sheetPillButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required Color color,
+    required Color textColor,
+    Color? borderColor,
+  }) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(50),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(50),
+        onTap: onTap,
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(50),
+            border: borderColor != null
+                ? Border.all(color: borderColor, width: 1.5)
+                : Border(bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 4)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: textColor, size: 22),
+              const SizedBox(width: 10),
+              Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w700, fontSize: 15)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

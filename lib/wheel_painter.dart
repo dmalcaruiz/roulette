@@ -1,8 +1,8 @@
 import 'dart:math';
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'wheel_item.dart';
+import 'icon_map.dart';
 
 class WheelPainter extends CustomPainter {
   final List<WheelItem> items;
@@ -162,6 +162,29 @@ class WheelPainter extends CustomPainter {
         ),
       );
 
+      // Draw icon if available (and no image)
+      if (item.iconName != null && item.imagePath == null) {
+        final iconData = lucideIconMap[item.iconName];
+        if (iconData != null) {
+          final iconPainter = TextPainter(
+            text: TextSpan(
+              text: String.fromCharCode(iconData.codePoint),
+              style: TextStyle(
+                fontSize: imageSize * 0.7,
+                fontFamily: iconData.fontFamily,
+                package: iconData.fontPackage,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          );
+          iconPainter.layout();
+          final iconX = radius - iconPainter.width - 20;
+          final iconY = -iconPainter.height / 2;
+          iconPainter.paint(canvas, Offset(iconX, iconY));
+        }
+      }
+
       // Draw image if available
       if (item.imagePath != null && imageCache.containsKey(item.imagePath)) {
         final image = imageCache[item.imagePath!]!;
@@ -192,6 +215,11 @@ class WheelPainter extends CustomPainter {
         canvas.restore();
       }
 
+      final hasVisual = (item.imagePath != null && imageCache.containsKey(item.imagePath)) || (item.iconName != null && lucideIconMap.containsKey(item.iconName));
+      final maxTextWidth = hasVisual
+          ? radius - centerInset - imageSize - 40
+          : radius - centerInset - 30;
+
       final textPainter = TextPainter(
         text: TextSpan(
           text: item.text,
@@ -199,12 +227,13 @@ class WheelPainter extends CustomPainter {
         ),
         textAlign: TextAlign.right,
         textDirection: TextDirection.ltr,
+        maxLines: 2,
+        ellipsis: '\u2026',
       );
 
-      textPainter.layout();
+      textPainter.layout(maxWidth: maxTextWidth > 0 ? maxTextWidth : 1);
 
-      // Adjust text position if image is present
-      final textOffset = item.imagePath != null && imageCache.containsKey(item.imagePath)
+      final textOffset = hasVisual
           ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2)
           : Offset(radius - textPainter.width - 20, -textPainter.height / 2);
 
@@ -317,6 +346,29 @@ class WheelPainter extends CustomPainter {
         ),
       );
 
+      // Draw icon if available and no image (winning segment)
+      if (winningItem.iconName != null && winningItem.imagePath == null) {
+        final iconData = lucideIconMap[winningItem.iconName];
+        if (iconData != null) {
+          final iconPainter = TextPainter(
+            text: TextSpan(
+              text: String.fromCharCode(iconData.codePoint),
+              style: TextStyle(
+                fontSize: imageSize * 0.7,
+                fontFamily: iconData.fontFamily,
+                package: iconData.fontPackage,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          );
+          iconPainter.layout();
+          final iconX = radius - iconPainter.width - 20;
+          final iconY = -iconPainter.height / 2;
+          iconPainter.paint(canvas, Offset(iconX, iconY));
+        }
+      }
+
       // Draw image if available (no opacity here - applied by saveLayer)
       if (winningItem.imagePath != null && imageCache.containsKey(winningItem.imagePath)) {
         final image = imageCache[winningItem.imagePath!]!;
@@ -347,6 +399,11 @@ class WheelPainter extends CustomPainter {
         canvas.restore();
       }
 
+      final hasVisual = (winningItem.imagePath != null && imageCache.containsKey(winningItem.imagePath)) || (winningItem.iconName != null && lucideIconMap.containsKey(winningItem.iconName));
+      final maxTextWidth = hasVisual
+          ? radius - centerInset - imageSize - 40
+          : radius - centerInset - 30;
+
       final textPainter = TextPainter(
         text: TextSpan(
           text: winningItem.text,
@@ -354,12 +411,13 @@ class WheelPainter extends CustomPainter {
         ),
         textAlign: TextAlign.right,
         textDirection: TextDirection.ltr,
+        maxLines: 2,
+        ellipsis: '\u2026',
       );
 
-      textPainter.layout();
+      textPainter.layout(maxWidth: maxTextWidth > 0 ? maxTextWidth : 1);
 
-      // Adjust text position if image is present
-      final textOffset = winningItem.imagePath != null && imageCache.containsKey(winningItem.imagePath)
+      final textOffset = hasVisual
           ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2)
           : Offset(radius - textPainter.width - 20, -textPainter.height / 2);
 

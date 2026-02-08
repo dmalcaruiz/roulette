@@ -85,7 +85,7 @@ class MyApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFF4F4F5),
+          fillColor: const Color(0xFFF8F8F9),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -336,6 +336,7 @@ class _WheelDemoState extends State<WheelDemo> {
   void _openCurrentWheelEditor() {
     if (_currentWheel != null) {
       setState(() {
+        // Sync editing wheel with current wheel when opening editor
         _editingWheel = _currentWheel;
         _previewWheel = null;
         _leftPanelView = 'current_wheel';
@@ -436,7 +437,7 @@ class _WheelDemoState extends State<WheelDemo> {
                 color: const Color(0xFFFEE2E2),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Icon(Icons.delete, color: Color(0xFFEF4444), size: 32),
+              child: Icon(LucideIcons.trash2, color: const Color(0xFFEF4444), size: 32),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -508,8 +509,7 @@ class _WheelDemoState extends State<WheelDemo> {
 
     setState(() {
       _leftPanelView = 'manager';
-      _editingWheel = null;
-      _previewWheel = null;
+      // Don't clear _editingWheel or _previewWheel - keep editor state alive
     });
   }
 
@@ -532,19 +532,31 @@ class _WheelDemoState extends State<WheelDemo> {
   }
 
   Widget _buildLeftPanel() {
-    switch (_leftPanelView) {
-      case 'current_wheel':
-      case 'new_wheel':
-        return _buildWheelEditorPanel();
-      case 'manager':
-      default:
-        return _buildWheelManagerPanel();
-    }
+    // Always build both panels so they're ready when switching
+    // But only show the active one
+    return Stack(
+      children: [
+        // Wheel Manager Panel
+        Offstage(
+          offstage: _leftPanelView != 'manager',
+          child: _buildWheelManagerPanel(),
+        ),
+        // Wheel Editor Panel
+        Offstage(
+          offstage: _leftPanelView == 'manager',
+          child: _buildWheelEditorPanel(),
+        ),
+      ],
+    );
   }
 
   Widget _buildWheelEditorPanel() {
+    // Always build so it's ready to display
+    // Use _editingWheel if set, otherwise use _currentWheel for sync
+    final wheelToEdit = _editingWheel ?? _currentWheel;
     return WheelEditor(
-      initialConfig: _editingWheel,
+      key: ValueKey(wheelToEdit?.id ?? 'new'),
+      initialConfig: wheelToEdit,
       onPreview: _handleWheelPreview,
     );
   }
@@ -575,6 +587,9 @@ class _WheelDemoState extends State<WheelDemo> {
                   physics: const NeverScrollableScrollPhysics(),
                   buildDefaultDragHandles: false,
                   itemCount: _savedWheels.length,
+                  proxyDecorator: (child, index, animation) {
+                    return child;
+                  },
                   onReorder: (oldIndex, newIndex) {
                     try {
                       _reorderSavedWheels(oldIndex, newIndex);
@@ -586,11 +601,11 @@ class _WheelDemoState extends State<WheelDemo> {
                     try {
                       final wheel = _savedWheels[index];
                       final isSelected = _currentWheel?.id == wheel.id;
-                      return ReorderableDragStartListener(
-                        key: ValueKey(wheel.id),
-                        index: index,
+                      final card = Material(
+                        color: Colors.transparent,
+                        child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
                         child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
                             color: isSelected ? const Color(0xFFE0F2FE) : Colors.white,
                             borderRadius: BorderRadius.circular(18),
@@ -609,13 +624,16 @@ class _WheelDemoState extends State<WheelDemo> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
-                                Icons.casino_rounded,
+                                LucideIcons.dices,
                                 color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
                                 size: 22,
+                                weight: 5.5,
                               ),
                             ),
                             title: Text(
                               wheel.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                             ),
                             subtitle: Text(
@@ -629,9 +647,9 @@ class _WheelDemoState extends State<WheelDemo> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                _iconBtn(Icons.copy_rounded, () => _duplicateWheel(wheel)),
+                                _iconBtn(LucideIcons.copy, () => _duplicateWheel(wheel)),
                                 const SizedBox(width: 2),
-                                _iconBtn(Icons.delete_rounded, () => _deleteWheel(wheel), color: const Color(0xFFEF4444)),
+                                _iconBtn(LucideIcons.trash2, () => _deleteWheel(wheel), color: const Color(0xFFEF4444)),
                               ],
                             ),
                             onTap: () {
@@ -643,6 +661,18 @@ class _WheelDemoState extends State<WheelDemo> {
                             },
                           ),
                         ),
+                      ),
+                      );
+
+                      return ReorderableDragStartListener(
+                        key: ValueKey(wheel.id),
+                        index: index,
+                        child: Column(
+                          children: [
+                            card,
+                            const SizedBox(height: 10),
+                          ],
+                        ),
                       );
                     } catch (e) {
                       debugPrint('Wheel item render error: $e');
@@ -652,7 +682,7 @@ class _WheelDemoState extends State<WheelDemo> {
                 ),
           const SizedBox(height: 10),
           _chunkyButton(
-            icon: Icons.add_rounded,
+            icon: LucideIcons.plus,
             label: 'Create New Wheel',
             onTap: _createNewWheel,
             color: const Color(0xFF38BDF8),
@@ -713,7 +743,7 @@ class _WheelDemoState extends State<WheelDemo> {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 20, color: color),
+          child: Icon(icon, size: 24, color: color,),
         ),
       ),
     );
@@ -745,9 +775,9 @@ class _WheelDemoState extends State<WheelDemo> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                     child: Row(
                       children: [
-                        Expanded(child: _navTab('Wheels', Icons.view_list_rounded, _leftPanelView == 'manager', _leftPanelView == 'manager' ? null : _openWheelManager)),
+                        Expanded(child: _navTab('Wheels', LucideIcons.list, _leftPanelView == 'manager', _leftPanelView == 'manager' ? null : _openWheelManager)),
                         const SizedBox(width: 10),
-                        Expanded(child: _navTab('Editor', Icons.edit_rounded, _leftPanelView == 'current_wheel', _currentWheel == null || _leftPanelView == 'current_wheel' ? null : _openCurrentWheelEditor)),
+                        Expanded(child: _navTab('Editor', LucideIcons.pencil, _leftPanelView == 'current_wheel', _currentWheel == null || _leftPanelView == 'current_wheel' ? null : _openCurrentWheelEditor)),
                       ],
                     ),
                   ),
@@ -798,7 +828,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _iconBtn(Icons.restart_alt_rounded, () => _wheelKey.currentState?.reset()),
+                            _iconBtn(LucideIcons.rotateCcw, () => _wheelKey.currentState?.reset()),
                             const SizedBox(width: 8),
                             // Big SPIN pill button
                             Material(
@@ -867,7 +897,7 @@ class _WheelDemoState extends State<WheelDemo> {
         padding: const EdgeInsets.only(right: 16, bottom: 16),
         child: FloatingActionButton(
           onPressed: _openColorPickerBottomSheet,
-          child: const Icon(Icons.palette_rounded),
+          child: const Icon(LucideIcons.palette),
         ),
       ),
     );
@@ -888,7 +918,7 @@ class _WheelDemoState extends State<WheelDemo> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 20, color: active ? Colors.white : const Color(0xFF1E1E2C).withValues(alpha: 0.6)),
+            Icon(icon, size: 22, color: active ? Colors.white : const Color(0xFF1E1E2C).withValues(alpha: 0.6)),
             const SizedBox(width: 8),
             Text(
               label,
