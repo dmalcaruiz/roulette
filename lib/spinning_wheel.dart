@@ -64,14 +64,28 @@ class SpinningWheelState extends State<SpinningWheel>
   String _currentSegment = '';
   final List<Timer> _scheduledSounds = [];
   final Map<String, ui.Image> _imageCache = {};
+  Timer? _imageRetryTimer;
   int _winningIndex = -1;
   double _overlayOpacity = 0.0;
+  late AnimationController _loadingController;
+  double _loadingAngle = 0.0;
 
   @override
   void initState() {
     super.initState();
     _initializeAudioPool();
-    _loadImages();
+
+    _loadingController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _loadingController.addListener(() {
+      setState(() {
+        _loadingAngle = _loadingController.value * 2 * pi;
+      });
+    });
+
+    _startImageLoading();
 
     _controller = AnimationController(
       duration: const Duration(milliseconds: 3000),
@@ -151,9 +165,51 @@ class SpinningWheelState extends State<SpinningWheel>
     }
   }
 
-  Future<void> _loadImages() async {
-    // Force an immediate repaint to show we're processing
-    setState(() {});
+  void _startImageLoading() {
+    _imageRetryTimer?.cancel();
+    _loadImagesWithRetry();
+  }
+
+  void _loadImagesWithRetry() {
+    if (!mounted) return;
+
+    // Check if there are pending images before attempting load
+    final hasPending = widget.items.any(
+      (item) => item.imagePath != null && !_imageCache.containsKey(item.imagePath),
+    );
+
+    if (!hasPending) {
+      _loadingController.stop();
+      _imageRetryTimer = null;
+      return;
+    }
+
+    // Start loading spinner if not already running
+    if (!_loadingController.isAnimating) {
+      _loadingController.repeat();
+    }
+
+    // Attempt to load images, then schedule next retry
+    _tryLoadImages().then((_) {
+      if (!mounted) return;
+
+      final stillPending = widget.items.any(
+        (item) => item.imagePath != null && !_imageCache.containsKey(item.imagePath),
+      );
+
+      if (stillPending) {
+        _imageRetryTimer = Timer(const Duration(milliseconds: 300), _loadImagesWithRetry);
+      } else {
+        _loadingController.stop();
+        _imageRetryTimer = null;
+        // Final setState to ensure wheel repaints with all images loaded
+        setState(() {});
+      }
+    });
+  }
+
+  Future<void> _tryLoadImages() async {
+    if (!mounted) return;
 
     for (final item in widget.items) {
       if (item.imagePath != null && !_imageCache.containsKey(item.imagePath)) {
@@ -170,7 +226,6 @@ class SpinningWheelState extends State<SpinningWheel>
             }
           }
         } catch (e) {
-          // Ignore image loading errors
           debugPrint('Error loading image ${item.imagePath}: $e');
         }
       }
@@ -194,12 +249,14 @@ class SpinningWheelState extends State<SpinningWheel>
     }
 
     if (itemsChanged || imagePathsChanged) {
-      _loadImages();
+      _startImageLoading();
     }
   }
 
   @override
   void dispose() {
+    _imageRetryTimer?.cancel();
+    _loadingController.dispose();
     _controller.dispose();
     _overlayController.dispose();
     for (var timer in _scheduledSounds) {
@@ -541,11 +598,12 @@ class SpinningWheelState extends State<SpinningWheel>
                     strokeWidth: widget.strokeWidth,
                     showBackgroundCircle: widget.showBackgroundCircle,
                     imageSize: widget.imageSize,
-                    imageCache: _imageCache,
+                    imageCache: Map.unmodifiable(_imageCache),
                     overlayOpacity: _overlayOpacity,
                     winningIndex: _winningIndex,
                     overlayColor: widget.overlayColor,
                     textVerticalOffset: widget.size / 700 * 2, // 2px at 700px, scales proportionally
+                    loadingAngle: _loadingAngle,
                   ),
                 ),
               ),

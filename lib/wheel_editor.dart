@@ -849,7 +849,7 @@ class _WheelEditorState extends State<WheelEditor> {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(7),
-          child: Icon(icon, size: 20, color: active ? const Color(0xFF38BDF8) : color),
+          child: Icon(icon, size: 24, color: active ? const Color(0xFF38BDF8) : color),
         ),
       ),
     );

@@ -17,6 +17,7 @@ class WheelPainter extends CustomPainter {
   final int winningIndex;
   final Color overlayColor;
   final double textVerticalOffset;
+  final double loadingAngle;
 
   WheelPainter({
     required this.items,
@@ -31,6 +32,7 @@ class WheelPainter extends CustomPainter {
     this.winningIndex = -1,
     this.overlayColor = Colors.black,
     this.textVerticalOffset = 0.0,
+    this.loadingAngle = 0.0,
   });
 
   @override
@@ -187,40 +189,52 @@ class WheelPainter extends CustomPainter {
         }
       }
 
-      // Draw image if available
-      if (item.imagePath != null && imageCache.containsKey(item.imagePath)) {
-        final image = imageCache[item.imagePath!]!;
+      // Draw image if available, or placeholder if still loading
+      if (item.imagePath != null) {
         final imageWidth = imageSize;
         final imageHeight = imageSize;
-
-        // Position image in the segment
         final imageX = radius - imageWidth - 20;
         final imageY = -imageHeight / 2;
-
-        // Create rounded rectangle clip path for the image
         final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
         final imageRoundedRect = RRect.fromRectAndRadius(
           imageRect,
           Radius.circular(cornerRadius),
         );
 
-        canvas.save();
-        canvas.clipRRect(imageRoundedRect);
+        if (imageCache.containsKey(item.imagePath)) {
+          final image = imageCache[item.imagePath!]!;
 
-        paintImage(
-          canvas: canvas,
-          rect: imageRect,
-          image: image,
-          fit: BoxFit.cover,
-        );
+          canvas.save();
+          canvas.clipRRect(imageRoundedRect);
 
-        canvas.restore();
+          paintImage(
+            canvas: canvas,
+            rect: imageRect,
+            image: image,
+            fit: BoxFit.cover,
+          );
+
+          canvas.restore();
+        } else {
+          // Draw spinning loading arc
+          final indicatorSize = imageSize * 0.3;
+          final indicatorCenter = Offset(imageX + imageWidth / 2, imageY + imageHeight / 2);
+          final indicatorRect = Rect.fromCenter(center: indicatorCenter, width: indicatorSize, height: indicatorSize);
+          canvas.drawArc(
+            indicatorRect,
+            loadingAngle,
+            pi * 1.2,
+            false,
+            Paint()
+              ..color = Colors.white.withValues(alpha: 0.8)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.5
+              ..strokeCap = StrokeCap.round,
+          );
+        }
       }
 
-      final hasVisual = (item.imagePath != null && imageCache.containsKey(item.imagePath)) || (item.iconName != null && lucideIconMap.containsKey(item.iconName));
-      final maxTextWidth = hasVisual
-          ? radius - centerInset - imageSize - 40
-          : radius - centerInset - 30;
+      final hasVisual = (item.imagePath != null) || (item.iconName != null && lucideIconMap.containsKey(item.iconName));
 
       final textPainter = TextPainter(
         text: TextSpan(
@@ -230,10 +244,9 @@ class WheelPainter extends CustomPainter {
         textAlign: TextAlign.right,
         textDirection: TextDirection.ltr,
         maxLines: 1,
-        ellipsis: '\u2026',
       );
 
-      textPainter.layout(maxWidth: maxTextWidth > 0 ? maxTextWidth : 1);
+      textPainter.layout();
 
       final textOffset = hasVisual
           ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2 - textVerticalOffset)
@@ -371,40 +384,56 @@ class WheelPainter extends CustomPainter {
         }
       }
 
-      // Draw image if available (no opacity here - applied by saveLayer)
-      if (winningItem.imagePath != null && imageCache.containsKey(winningItem.imagePath)) {
-        final image = imageCache[winningItem.imagePath!]!;
+      // Draw image if available, or placeholder if still loading (no opacity here - applied by saveLayer)
+      if (winningItem.imagePath != null) {
         final imageWidth = imageSize;
         final imageHeight = imageSize;
-
-        // Position image in the segment
         final imageX = radius - imageWidth - 20;
         final imageY = -imageHeight / 2;
-
-        // Create rounded rectangle clip path for the image
         final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
         final imageRoundedRect = RRect.fromRectAndRadius(
           imageRect,
           Radius.circular(cornerRadius),
         );
 
-        canvas.save();
-        canvas.clipRRect(imageRoundedRect);
+        if (imageCache.containsKey(winningItem.imagePath)) {
+          final image = imageCache[winningItem.imagePath!]!;
 
-        paintImage(
-          canvas: canvas,
-          rect: imageRect,
-          image: image,
-          fit: BoxFit.cover,
-        );
+          canvas.save();
+          canvas.clipRRect(imageRoundedRect);
 
-        canvas.restore();
+          paintImage(
+            canvas: canvas,
+            rect: imageRect,
+            image: image,
+            fit: BoxFit.cover,
+          );
+
+          canvas.restore();
+        } else {
+          // Draw placeholder
+          canvas.drawRRect(
+            imageRoundedRect,
+            Paint()..color = Colors.white.withValues(alpha: 0.25),
+          );
+          final indicatorSize = imageSize * 0.3;
+          final indicatorCenter = Offset(imageX + imageWidth / 2, imageY + imageHeight / 2);
+          final indicatorRect = Rect.fromCenter(center: indicatorCenter, width: indicatorSize, height: indicatorSize);
+          canvas.drawArc(
+            indicatorRect,
+            loadingAngle,
+            pi * 1.2,
+            false,
+            Paint()
+              ..color = Colors.white.withValues(alpha: 0.8)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.5
+              ..strokeCap = StrokeCap.round,
+          );
+        }
       }
 
-      final hasVisual = (winningItem.imagePath != null && imageCache.containsKey(winningItem.imagePath)) || (winningItem.iconName != null && lucideIconMap.containsKey(winningItem.iconName));
-      final maxTextWidth = hasVisual
-          ? radius - centerInset - imageSize - 40
-          : radius - centerInset - 30;
+      final hasVisual = (winningItem.imagePath != null) || (winningItem.iconName != null && lucideIconMap.containsKey(winningItem.iconName));
 
       final textPainter = TextPainter(
         text: TextSpan(
@@ -414,10 +443,9 @@ class WheelPainter extends CustomPainter {
         textAlign: TextAlign.right,
         textDirection: TextDirection.ltr,
         maxLines: 1,
-        ellipsis: '\u2026',
       );
 
-      textPainter.layout(maxWidth: maxTextWidth > 0 ? maxTextWidth : 1);
+      textPainter.layout();
 
       final textOffset = hasVisual
           ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2 - textVerticalOffset)
@@ -449,6 +477,7 @@ class WheelPainter extends CustomPainter {
            oldDelegate.winningIndex != winningIndex ||
            oldDelegate.overlayColor != overlayColor ||
            oldDelegate.textVerticalOffset != textVerticalOffset ||
+           oldDelegate.loadingAngle != loadingAngle ||
            imageCacheChanged;
   }
 }

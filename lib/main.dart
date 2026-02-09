@@ -1114,71 +1114,72 @@ class _WheelDemoState extends State<WheelDemo> {
                               borderRadius: BorderRadius.circular(50),
                               border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
                             ),
-                            child: Column(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    PushDownButton(
-                                      color: const Color(0xFFAE01CB),
-                                      onTap: () => _wheelKey.currentState?.reset(),
-                                      height: 64,
-                                      bottomBorderColor: const Color(0xFF8A009F),
-                                      child: const SizedBox(
-                                        width: 59,
-                                        child: Center(
-                                          child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
-                                        ),
-                                      ),
+                                PushDownButton(
+                                  color: const Color(0xFFAE01CB),
+                                  onTap: () => _wheelKey.currentState?.reset(),
+                                  height: 64,
+                                  bottomBorderColor: const Color(0xFF8A009F),
+                                  child: const SizedBox(
+                                    width: 59,
+                                    child: Center(
+                                      child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
                                     ),
-                                    const SizedBox(width: 10),
-                                    // Big SPIN pill button
-                                    PushDownButton(
-                                      color: const Color(0xFF38BDF8),
-                                      onTap: () => _wheelKey.currentState?.spin(),
-                                      height: 64,
-                                      bottomBorderColor: const Color(0xFF0EA5E9),
-                                      child: const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 52),
-                                        child: Center(
-                                          child: Text(
-                                            'SPIN',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 28,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                                const SizedBox(height: 10),
-                                Wrap(
-                                  alignment: WrapAlignment.center,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
-                                    _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
-                                    if (!_isRandomIntensity) ...[
-                                      SizedBox(
-                                        width: 140,
-                                        child: Slider(
-                                          value: _spinIntensity,
-                                          min: 0.0,
-                                          max: 1.0,
-                                          divisions: 20,
-                                          label: '${(_spinIntensity * 100).round()}%',
-                                          onChanged: (value) => setState(() => _spinIntensity = value),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: PushDownButton(
+                                    color: const Color(0xFF38BDF8),
+                                    onTap: () => _wheelKey.currentState?.spin(),
+                                    height: 64,
+                                    bottomBorderColor: const Color(0xFF0EA5E9),
+                                    child: const Center(
+                                      child: Text(
+                                        'SPIN',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 2,
                                         ),
                                       ),
-                                      Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                    ],
-                                  ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
+                                const SizedBox(width: 8),
+                                _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
+                                if (!_isRandomIntensity) ...[
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 100,
+                                    child: Slider(
+                                      value: _spinIntensity,
+                                      min: 0.0,
+                                      max: 1.0,
+                                      divisions: 20,
+                                      label: '${(_spinIntensity * 100).round()}%',
+                                      onChanged: (value) => setState(() => _spinIntensity = value),
+                                    ),
+                                  ),
+                                  Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                ],
+                                const SizedBox(width: 10),
+                                PushDownButton(
+                                  color: const Color(0xFF1E1E2C),
+                                  onTap: _openColorPickerBottomSheet,
+                                  height: 64,
+                                  bottomBorderColor: Colors.black,
+                                  child: const SizedBox(
+                                    width: 59,
+                                    child: Center(
+                                      child: Icon(LucideIcons.palette, color: Colors.white, size: 28),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1199,13 +1200,6 @@ class _WheelDemoState extends State<WheelDemo> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(right: 16, bottom: 16),
-        child: FloatingActionButton(
-          onPressed: _openColorPickerBottomSheet,
-          child: const Icon(LucideIcons.palette),
-        ),
       ),
     );
   }
