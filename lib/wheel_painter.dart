@@ -39,6 +39,7 @@ class WheelPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = min(size.width, size.height) / 2;
+    final scale = radius / 350.0; // Scale factor relative to base 700px wheel
 
     // Draw background circle if enabled
     if (showBackgroundCircle) {
@@ -183,7 +184,7 @@ class WheelPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           );
           iconPainter.layout();
-          final iconX = radius - iconPainter.width - 20;
+          final iconX = radius - iconPainter.width - 20 * scale;
           final iconY = -iconPainter.height / 2;
           iconPainter.paint(canvas, Offset(iconX, iconY));
         }
@@ -193,7 +194,7 @@ class WheelPainter extends CustomPainter {
       if (item.imagePath != null) {
         final imageWidth = imageSize;
         final imageHeight = imageSize;
-        final imageX = radius - imageWidth - 20;
+        final imageX = radius - imageWidth - 20 * scale;
         final imageY = -imageHeight / 2;
         final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
         final imageRoundedRect = RRect.fromRectAndRadius(
@@ -249,8 +250,8 @@ class WheelPainter extends CustomPainter {
       textPainter.layout();
 
       final textOffset = hasVisual
-          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2 - textVerticalOffset)
-          : Offset(radius - textPainter.width - 20, -textPainter.height / 2 - textVerticalOffset);
+          ? Offset(radius - textPainter.width - imageSize - 30 * scale, -textPainter.height / 2 - textVerticalOffset)
+          : Offset(radius - textPainter.width - 20 * scale, -textPainter.height / 2 - textVerticalOffset);
 
       textPainter.paint(canvas, textOffset);
 
@@ -378,7 +379,7 @@ class WheelPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           );
           iconPainter.layout();
-          final iconX = radius - iconPainter.width - 20;
+          final iconX = radius - iconPainter.width - 20 * scale;
           final iconY = -iconPainter.height / 2;
           iconPainter.paint(canvas, Offset(iconX, iconY));
         }
@@ -388,7 +389,7 @@ class WheelPainter extends CustomPainter {
       if (winningItem.imagePath != null) {
         final imageWidth = imageSize;
         final imageHeight = imageSize;
-        final imageX = radius - imageWidth - 20;
+        final imageX = radius - imageWidth - 20 * scale;
         final imageY = -imageHeight / 2;
         final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
         final imageRoundedRect = RRect.fromRectAndRadius(
@@ -448,8 +449,8 @@ class WheelPainter extends CustomPainter {
       textPainter.layout();
 
       final textOffset = hasVisual
-          ? Offset(radius - textPainter.width - imageSize - 30, -textPainter.height / 2 - textVerticalOffset)
-          : Offset(radius - textPainter.width - 20, -textPainter.height / 2 - textVerticalOffset);
+          ? Offset(radius - textPainter.width - imageSize - 30 * scale, -textPainter.height / 2 - textVerticalOffset)
+          : Offset(radius - textPainter.width - 20 * scale, -textPainter.height / 2 - textVerticalOffset);
 
       textPainter.paint(canvas, textOffset);
 
