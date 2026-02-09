@@ -624,6 +624,7 @@ class _WheelDemoState extends State<WheelDemo> {
                             ),
                           ),
                           child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () {
                               setState(() {
                                 _currentWheel = wheel;
