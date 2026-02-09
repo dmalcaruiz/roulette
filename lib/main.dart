@@ -191,7 +191,7 @@ class _WheelDemoState extends State<WheelDemo> {
   // Snapping sheet controls (mobile)
   final SnappingSheetController _snappingSheetController = SnappingSheetController();
   final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
-  static const double _grabbingHeight = 70.0;
+  static const double _grabbingHeight = 84.0;
 
   // Preset templates (mutable for reordering)
   final List<WheelConfig> _presets = [
@@ -777,7 +777,9 @@ class _WheelDemoState extends State<WheelDemo> {
           right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
         ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
           // Drag indicator bar
@@ -884,18 +886,17 @@ class _WheelDemoState extends State<WheelDemo> {
                       ValueListenableBuilder<double>(
                         valueListenable: _currentSheetHeight,
                         builder: (context, sheetHeight, _) {
-                          final availableHeight = screenHeight - safeTop - safeBottom - sheetHeight - _grabbingHeight;
-                          final maxWheelSize = min(availableHeight - 130, effectiveWheelSize);
+                          final availableHeight = screenHeight - safeTop - safeBottom - sheetHeight - _grabbingHeight + 45;
+                          final maxWheelSize = min(availableHeight - 190, effectiveWheelSize);
                           final clampedWheelSize = maxWheelSize.clamp(80.0, effectiveWheelSize);
                           final dynamicWheelScale = clampedWheelSize / idealWheelSize;
 
                           return Container(
                             height: availableHeight.clamp(200.0, screenHeight),
                             color: Colors.transparent,
-                            child: Center(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.start,
                                   children: [
                                     if (_previewWheel != null || _currentWheel != null) ...[
                                       const SizedBox(height: 10),
@@ -1002,7 +1003,6 @@ class _WheelDemoState extends State<WheelDemo> {
                                       ),
                                   ],
                                 ),
-                              ),
                             ),
                           );
                         },
