@@ -1077,6 +1077,7 @@ class _WheelDemoState extends State<WheelDemo> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
                 child: SingleChildScrollView(
+                  clipBehavior: Clip.none,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
