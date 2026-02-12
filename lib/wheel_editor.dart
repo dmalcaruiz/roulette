@@ -9,6 +9,7 @@ import 'wheel_config.dart';
 import 'wheel_item.dart';
 import 'icon_map.dart';
 import 'push_down_button.dart';
+import 'swipeable_action_cell.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -585,8 +586,6 @@ class _WheelEditorState extends State<WheelEditor> {
                               () => _openVisualConfigSheet(index),
                               active: segment.imagePath != null || segment.iconName != null,
                             ),
-                            _segIconBtn(LucideIcons.copy, () => _duplicateSegment(index)),
-                            _segIconBtn(LucideIcons.trash2, () => _removeSegment(index), color: const Color(0xFFEF4444)),
                           ],
                         ),
                         if (_editingColorIndex == index) ...[
@@ -756,9 +755,26 @@ class _WheelEditorState extends State<WheelEditor> {
                 ),
                 );
 
+                final swipeableCard = SwipeableActionCell(
+                  trailingActions: [
+                    SwipeableAction(
+                      color: const Color(0xFF38BDF8),
+                      icon: LucideIcons.copy,
+                      onTap: () => _duplicateSegment(index),
+                    ),
+                    SwipeableAction(
+                      color: const Color(0xFFEF4444),
+                      icon: LucideIcons.trash2,
+                      onTap: () => _removeSegment(index),
+                      expandOnFullSwipe: true,
+                    ),
+                  ],
+                  child: card,
+                );
+
                 final itemContent = Column(
                   children: [
-                    card,
+                    swipeableCard,
                     const SizedBox(height: 10),
                   ],
                 );

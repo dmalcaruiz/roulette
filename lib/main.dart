@@ -12,6 +12,7 @@ import 'wheel_config.dart';
 import 'wheel_manager.dart';
 import 'wheel_editor.dart';
 import 'push_down_button.dart';
+import 'swipeable_action_cell.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -186,12 +187,13 @@ class _WheelDemoState extends State<WheelDemo> {
   double _spinIntensity = 0.5;
   bool _isRandomIntensity = true;
   bool _showWinAnimation = true;
+  bool _isReorderMode = false;
   final GlobalKey<SpinningWheelState> _wheelKey = GlobalKey<SpinningWheelState>();
 
   // Snapping sheet controls (mobile)
   final SnappingSheetController _snappingSheetController = SnappingSheetController();
   final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
-  static const double _grabbingHeight = 84.0;
+  static const double _grabbingHeight = 28.0;
 
   // Preset templates (mutable for reordering)
   final List<WheelConfig> _presets = [
@@ -338,6 +340,269 @@ class _WheelDemoState extends State<WheelDemo> {
             _overlayColor = color;
           });
         },
+      ),
+    );
+  }
+
+  void _openWheelsScreen() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _WheelsScreen(
+            savedWheels: _savedWheels,
+            currentWheel: _currentWheel,
+            isReorderMode: _isReorderMode,
+            onWheelSelected: (wheel) {
+              setState(() {
+                _currentWheel = wheel;
+                _previewWheel = null;
+                _editingWheel = null;
+              });
+            },
+            onDuplicateWheel: _duplicateWheel,
+            onDeleteWheel: _deleteWheel,
+            onReorderWheels: _reorderSavedWheels,
+            onCreateNewWheel: _createNewWheel,
+            onReorderModeChanged: (v) => setState(() => _isReorderMode = v),
+            buildWheelCard: _buildWheelCard,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  void _openGearMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      isDismissible: true,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4D4D8),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text('Spin Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 24),
+              // Random intensity toggle
+              _gearToggleRow(
+                'Random Intensity',
+                LucideIcons.shuffle,
+                _isRandomIntensity,
+                (v) {
+                  setSheetState(() => _isRandomIntensity = v);
+                  setState(() => _isRandomIntensity = v);
+                },
+              ),
+              const SizedBox(height: 12),
+              // Intensity slider (only when not random)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                child: !_isRandomIntensity
+                    ? Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: Text(
+                                'Intensity',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: const Color(0xFF1E1E2C).withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: _spinIntensity,
+                                min: 0.0,
+                                max: 1.0,
+                                divisions: 20,
+                                label: '${(_spinIntensity * 100).round()}%',
+                                onChanged: (value) {
+                                  setSheetState(() => _spinIntensity = value);
+                                  setState(() => _spinIntensity = value);
+                                },
+                              ),
+                            ),
+                            SizedBox(
+                              width: 44,
+                              child: Text(
+                                '${(_spinIntensity * 100).round()}%',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              // Win effects toggle
+              _gearToggleRow(
+                'Win Effects',
+                LucideIcons.sparkles,
+                _showWinAnimation,
+                (v) {
+                  setSheetState(() => _showWinAnimation = v);
+                  setState(() => _showWinAnimation = v);
+                },
+              ),
+              const SizedBox(height: 24),
+              // Color picker button
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  _openColorPickerBottomSheet();
+                },
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F4F5),
+                    borderRadius: BorderRadius.circular(50),
+                    border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(LucideIcons.palette, size: 22, color: Color(0xFF1E1E2C)),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Colors',
+                        style: TextStyle(
+                          color: Color(0xFF1E1E2C),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Preview swatches
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: _backgroundColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: _textColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: _overlayColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _gearToggleRow(String label, IconData icon, bool value, ValueChanged<bool> onChanged) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: value ? const Color(0xFF38BDF8).withValues(alpha: 0.12) : const Color(0xFFF4F4F5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: value ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: value ? const Color(0xFF0EA5E9) : const Color(0xFF1E1E2C).withValues(alpha: 0.45),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: value ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 44,
+              height: 26,
+              decoration: BoxDecoration(
+                color: value ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 180),
+                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -567,6 +832,88 @@ class _WheelDemoState extends State<WheelDemo> {
     );
   }
 
+  Widget _buildWheelCard(WheelConfig wheel, bool isSelected, {bool showDragHandle = false, VoidCallback? onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFE0F2FE) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
+              width: 1.5,
+            ),
+          ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap ?? () {
+              setState(() {
+                _currentWheel = wheel;
+                _previewWheel = null;
+                _editingWheel = null;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  if (showDragHandle) ...[
+                    Icon(
+                      LucideIcons.gripVertical,
+                      color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      LucideIcons.dices,
+                      color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
+                      size: 22,
+                      weight: 5.5,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          wheel.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${wheel.items.length} segments',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWheelManagerPanel() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -588,131 +935,99 @@ class _WheelDemoState extends State<WheelDemo> {
                     ),
                   ),
                 )
-              : ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  itemCount: _savedWheels.length,
-                  proxyDecorator: (child, index, animation) {
-                    return Transform.scale(
-                      scale: 1.1,
-                      child: child,
-                    );
-                  },
-                  onReorder: (oldIndex, newIndex) {
-                    try {
-                      _reorderSavedWheels(oldIndex, newIndex);
-                    } catch (e) {
-                      debugPrint('Reorder error (safe to ignore): $e');
-                    }
-                  },
-                  itemBuilder: (context, index) {
-                    try {
+              : _isReorderMode
+                ? ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: _savedWheels.length,
+                    proxyDecorator: (child, index, animation) {
+                      return Transform.scale(
+                        scale: 1.1,
+                        child: child,
+                      );
+                    },
+                    onReorder: (oldIndex, newIndex) {
+                      try {
+                        _reorderSavedWheels(oldIndex, newIndex);
+                      } catch (e) {
+                        debugPrint('Reorder error (safe to ignore): $e');
+                      }
+                    },
+                    itemBuilder: (context, index) {
                       final wheel = _savedWheels[index];
                       final isSelected = _currentWheel?.id == wheel.id;
-                      final card = Material(
-                        color: Colors.transparent,
-                        child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFFE0F2FE) : Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              setState(() {
-                                _currentWheel = wheel;
-                                _previewWheel = null;
-                                _editingWheel = null;
-                              });
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      LucideIcons.dices,
-                                      color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
-                                      size: 22,
-                                      weight: 5.5,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          wheel.name,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${wheel.items.length} segments',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 13,
-                                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      _iconBtn(LucideIcons.copy, () => _duplicateWheel(wheel)),
-                                      const SizedBox(width: 2),
-                                      _iconBtn(LucideIcons.trash2, () => _deleteWheel(wheel), color: const Color(0xFFEF4444)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      );
-
                       return ReorderableDelayedDragStartListener(
                         key: ValueKey(wheel.id),
                         index: index,
                         child: Column(
                           children: [
-                            card,
+                            _buildWheelCard(wheel, isSelected, showDragHandle: true),
                             const SizedBox(height: 10),
                           ],
                         ),
                       );
-                    } catch (e) {
-                      debugPrint('Wheel item render error: $e');
-                      return Container(key: ValueKey('error_${_savedWheels[index].id}'));
-                    }
-                  },
-                ),
+                    },
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _savedWheels.length,
+                    itemBuilder: (context, index) {
+                      try {
+                        final wheel = _savedWheels[index];
+                        final isSelected = _currentWheel?.id == wheel.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: SwipeableActionCell(
+                            key: ValueKey(wheel.id),
+                            // Swipe left to reveal copy + delete (trailing)
+                            trailingActions: [
+                              SwipeableAction(
+                                color: const Color(0xFF38BDF8),
+                                icon: LucideIcons.copy,
+                                onTap: () => _duplicateWheel(wheel),
+                              ),
+                              SwipeableAction(
+                                color: const Color(0xFFEF4444),
+                                icon: LucideIcons.trash2,
+                                onTap: () => _deleteWheel(wheel),
+                                expandOnFullSwipe: true,
+                              ),
+                            ],
+                            // Swipe right to activate reorder mode (leading)
+                            leadingActions: [
+                              SwipeableAction(
+                                color: const Color(0xFF1E1E2C),
+                                icon: LucideIcons.gripVertical,
+                                onTap: () => setState(() => _isReorderMode = true),
+                                expandOnFullSwipe: true,
+                              ),
+                            ],
+                            child: _buildWheelCard(wheel, isSelected),
+                          ),
+                        );
+                      } catch (e) {
+                        debugPrint('Wheel item render error: $e');
+                        return Container(key: ValueKey('error_${_savedWheels[index].id}'));
+                      }
+                    },
+                  ),
           const SizedBox(height: 10),
-          _chunkyButton(
-            icon: LucideIcons.plus,
-            label: 'Create New Wheel',
-            onTap: _createNewWheel,
-            color: const Color(0xFF38BDF8),
-          ),
+          if (_isReorderMode)
+            _chunkyButton(
+              icon: LucideIcons.check,
+              label: 'Done Reordering',
+              onTap: () => setState(() => _isReorderMode = false),
+              color: const Color(0xFF1E1E2C),
+            )
+          else
+            _chunkyButton(
+              icon: LucideIcons.plus,
+              label: 'Create New Wheel',
+              onTap: _createNewWheel,
+              color: const Color(0xFF38BDF8),
+            ),
         ],
       ),
     );
@@ -751,20 +1066,6 @@ class _WheelDemoState extends State<WheelDemo> {
     );
   }
 
-  // Small icon button helper
-  Widget _iconBtn(IconData icon, VoidCallback onTap, {Color color = const Color(0xFF1E1E2C)}) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 24, color: color,),
-        ),
-      ),
-    );
-  }
 
   Widget _buildGrabbingHandle() {
     return Container(
@@ -791,20 +1092,7 @@ class _WheelDemoState extends State<WheelDemo> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 10),
-          // Nav tab chips
-          if (_leftPanelView != 'new_wheel')
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(child: _navTab('Wheels', LucideIcons.list, _leftPanelView == 'manager', _leftPanelView == 'manager' ? null : _openWheelManager)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _navTab('Editor', LucideIcons.pencil, _leftPanelView == 'current_wheel', _currentWheel == null || _leftPanelView == 'current_wheel' ? null : _openCurrentWheelEditor)),
-                ],
-              ),
-            ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -871,11 +1159,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
                       ),
                     ),
-                    child: Column(
-                      children: [
-                        Expanded(child: _buildLeftPanel()),
-                      ],
-                    ),
+                    child: _buildWheelEditorPanel(),
                   ),
                 ),
                 // Main content above the sheet
@@ -887,7 +1171,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         valueListenable: _currentSheetHeight,
                         builder: (context, sheetHeight, _) {
                           final availableHeight = screenHeight - safeTop - safeBottom - sheetHeight - _grabbingHeight + 45;
-                          final maxWheelSize = min(availableHeight - 190, effectiveWheelSize);
+                          final maxWheelSize = min(availableHeight - 140, effectiveWheelSize);
                           final clampedWheelSize = maxWheelSize.clamp(80.0, effectiveWheelSize);
                           final dynamicWheelScale = clampedWheelSize / idealWheelSize;
 
@@ -921,75 +1205,61 @@ class _WheelDemoState extends State<WheelDemo> {
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-                                      // Compact spin controls
+                                      // Compact spin controls: Reset + Spin + Edit
                                       Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        child: Column(
+                                        child: Row(
                                           children: [
-                                            Row(
-                                              children: [
-                                                PushDownButton(
-                                                  color: const Color(0xFFAE01CB),
-                                                  onTap: () => _wheelKey.currentState?.reset(),
-                                                  height: 64,
-                                                  bottomBorderColor: const Color(0xFF8A009F),
-                                                  child: const SizedBox(
-                                                    width: 59,
-                                                    child: Center(
-                                                      child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
-                                                    ),
-                                                  ),
+                                            PushDownButton(
+                                              color: const Color(0xFFAE01CB),
+                                              onTap: () => _wheelKey.currentState?.reset(),
+                                              height: 64,
+                                              bottomBorderColor: const Color(0xFF8A009F),
+                                              child: const SizedBox(
+                                                width: 59,
+                                                child: Center(
+                                                  child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
                                                 ),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: PushDownButton(
-                                                    color: const Color(0xFF38BDF8),
-                                                    onTap: () => _wheelKey.currentState?.spin(),
-                                                    height: 64,
-                                                    bottomBorderColor: const Color(0xFF0EA5E9),
-                                                    child: const Center(
-                                                      child: Text(
-                                                        'SPIN',
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 24,
-                                                          fontWeight: FontWeight.w800,
-                                                          letterSpacing: 2,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
-                                                const SizedBox(width: 8),
-                                                _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
-                                              ],
-                                            ),
-                                            if (!_isRandomIntensity) ...[
-                                              const SizedBox(height: 8),
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Slider(
-                                                      value: _spinIntensity,
-                                                      min: 0.0,
-                                                      max: 1.0,
-                                                      divisions: 20,
-                                                      label: '${(_spinIntensity * 100).round()}%',
-                                                      onChanged: (value) => setState(() => _spinIntensity = value),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                                ],
                                               ),
-                                            ],
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: PushDownButton(
+                                                color: const Color(0xFF38BDF8),
+                                                onTap: () => _wheelKey.currentState?.spin(),
+                                                height: 64,
+                                                bottomBorderColor: const Color(0xFF0EA5E9),
+                                                child: const Center(
+                                                  child: Text(
+                                                    'SPIN',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 24,
+                                                      fontWeight: FontWeight.w800,
+                                                      letterSpacing: 2,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            PushDownButton(
+                                              color: const Color(0xFF1E1E2C),
+                                              onTap: () {
+                                                _openCurrentWheelEditor();
+                                                _snappingSheetController.snapToPosition(
+                                                  const SnappingPosition.pixels(positionPixels: 350),
+                                                );
+                                              },
+                                              height: 64,
+                                              bottomBorderColor: Colors.black,
+                                              child: const SizedBox(
+                                                width: 59,
+                                                child: Center(
+                                                  child: Icon(LucideIcons.pencil, color: Colors.white, size: 28),
+                                                ),
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -1011,26 +1281,53 @@ class _WheelDemoState extends State<WheelDemo> {
                   ),
                 ),
               ),
-              // Color picker button floating at bottom-right
+              // Transparent app bar
               Positioned(
-                bottom: safeBottom + 12,
-                right: 16,
-                child: Material(
-                  color: const Color(0xFF1E1E2C),
-                  borderRadius: BorderRadius.circular(50),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(50),
-                    onTap: _openColorPickerBottomSheet,
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(50),
-                        border: Border(
-                          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.25), width: 4),
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Settings button (left)
+                        Material(
+                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(50),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(50),
+                            onTap: _openGearMenu,
+                            child: Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: const Icon(LucideIcons.settings, color: Colors.white, size: 22),
+                            ),
+                          ),
                         ),
-                      ),
-                      child: const Icon(LucideIcons.palette, color: Colors.white, size: 22),
+                        // Wheels button (right)
+                        Material(
+                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(50),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(50),
+                            onTap: _openWheelsScreen,
+                            child: Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: const Icon(LucideIcons.list, color: Colors.white, size: 22),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1115,7 +1412,6 @@ class _WheelDemoState extends State<WheelDemo> {
                               border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
                             ),
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 PushDownButton(
                                   color: const Color(0xFFAE01CB),
@@ -1150,34 +1446,15 @@ class _WheelDemoState extends State<WheelDemo> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                _chipToggle('Random', _isRandomIntensity, (v) => setState(() => _isRandomIntensity = v)),
-                                const SizedBox(width: 8),
-                                _chipToggle('Effects', _showWinAnimation, (v) => setState(() => _showWinAnimation = v)),
-                                if (!_isRandomIntensity) ...[
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 100,
-                                    child: Slider(
-                                      value: _spinIntensity,
-                                      min: 0.0,
-                                      max: 1.0,
-                                      divisions: 20,
-                                      label: '${(_spinIntensity * 100).round()}%',
-                                      onChanged: (value) => setState(() => _spinIntensity = value),
-                                    ),
-                                  ),
-                                  Text('${(_spinIntensity * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                ],
-                                const SizedBox(width: 10),
                                 PushDownButton(
                                   color: const Color(0xFF1E1E2C),
-                                  onTap: _openColorPickerBottomSheet,
+                                  onTap: _openGearMenu,
                                   height: 64,
                                   bottomBorderColor: Colors.black,
                                   child: const SizedBox(
                                     width: 59,
                                     child: Center(
-                                      child: Icon(LucideIcons.palette, color: Colors.white, size: 28),
+                                      child: Icon(LucideIcons.settings, color: Colors.white, size: 28),
                                     ),
                                   ),
                                 ),
@@ -1235,28 +1512,212 @@ class _WheelDemoState extends State<WheelDemo> {
     );
   }
 
-  // Chip toggle for spin controls
-  Widget _chipToggle(String label, bool value, ValueChanged<bool> onChanged) {
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: value ? const Color(0xFF38BDF8).withValues(alpha: 0.15) : const Color(0xFFF4F4F5),
-          borderRadius: BorderRadius.circular(50),
-          border: Border.all(
-            color: value ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            color: value ? const Color(0xFF0EA5E9) : const Color(0xFF1E1E2C).withValues(alpha: 0.5),
-          ),
+}
+
+class _WheelsScreen extends StatefulWidget {
+  final List<WheelConfig> savedWheels;
+  final WheelConfig? currentWheel;
+  final bool isReorderMode;
+  final ValueChanged<WheelConfig> onWheelSelected;
+  final Future<void> Function(WheelConfig) onDuplicateWheel;
+  final Future<void> Function(WheelConfig) onDeleteWheel;
+  final Future<void> Function(int, int) onReorderWheels;
+  final Future<void> Function() onCreateNewWheel;
+  final ValueChanged<bool> onReorderModeChanged;
+  final Widget Function(WheelConfig wheel, bool isSelected, {bool showDragHandle, VoidCallback? onTap}) buildWheelCard;
+
+  const _WheelsScreen({
+    required this.savedWheels,
+    required this.currentWheel,
+    required this.isReorderMode,
+    required this.onWheelSelected,
+    required this.onDuplicateWheel,
+    required this.onDeleteWheel,
+    required this.onReorderWheels,
+    required this.onCreateNewWheel,
+    required this.onReorderModeChanged,
+    required this.buildWheelCard,
+  });
+
+  @override
+  State<_WheelsScreen> createState() => _WheelsScreenState();
+}
+
+class _WheelsScreenState extends State<_WheelsScreen> {
+  late bool _isReorderMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _isReorderMode = widget.isReorderMode;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header with back button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(LucideIcons.arrowLeft, size: 24),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 4),
+                  Text('Your Wheels', style: Theme.of(context).textTheme.headlineMedium),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Wheel list
+            Expanded(
+              child: widget.savedWheels.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No saved wheels yet.\nCreate your first wheel!',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.45),
+                        ),
+                      ),
+                    )
+                  : _isReorderMode
+                      ? ReorderableListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          buildDefaultDragHandles: false,
+                          itemCount: widget.savedWheels.length,
+                          proxyDecorator: (child, index, animation) {
+                            return Transform.scale(scale: 1.1, child: child);
+                          },
+                          onReorder: (oldIndex, newIndex) {
+                            try {
+                              widget.onReorderWheels(oldIndex, newIndex);
+                              setState(() {});
+                            } catch (e) {
+                              debugPrint('Reorder error: $e');
+                            }
+                          },
+                          itemBuilder: (context, index) {
+                            final wheel = widget.savedWheels[index];
+                            final isSelected = widget.currentWheel?.id == wheel.id;
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey(wheel.id),
+                              index: index,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: widget.buildWheelCard(wheel, isSelected, showDragHandle: true, onTap: () {
+                                  widget.onWheelSelected(wheel);
+                                  Navigator.pop(context);
+                                }),
+                              ),
+                            );
+                          },
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: widget.savedWheels.length,
+                          itemBuilder: (context, index) {
+                            try {
+                              final wheel = widget.savedWheels[index];
+                              final isSelected = widget.currentWheel?.id == wheel.id;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: SwipeableActionCell(
+                                  key: ValueKey(wheel.id),
+                                  trailingActions: [
+                                    SwipeableAction(
+                                      color: const Color(0xFF38BDF8),
+                                      icon: LucideIcons.copy,
+                                      onTap: () {
+                                        widget.onDuplicateWheel(wheel);
+                                        setState(() {});
+                                      },
+                                    ),
+                                    SwipeableAction(
+                                      color: const Color(0xFFEF4444),
+                                      icon: LucideIcons.trash2,
+                                      onTap: () {
+                                        widget.onDeleteWheel(wheel);
+                                        setState(() {});
+                                      },
+                                      expandOnFullSwipe: true,
+                                    ),
+                                  ],
+                                  leadingActions: [
+                                    SwipeableAction(
+                                      color: const Color(0xFF1E1E2C),
+                                      icon: LucideIcons.gripVertical,
+                                      onTap: () {
+                                        widget.onReorderModeChanged(true);
+                                        setState(() => _isReorderMode = true);
+                                      },
+                                      expandOnFullSwipe: true,
+                                    ),
+                                  ],
+                                  child: widget.buildWheelCard(wheel, isSelected, onTap: () {
+                                    widget.onWheelSelected(wheel);
+                                    Navigator.pop(context);
+                                  }),
+                                ),
+                              );
+                            } catch (e) {
+                              debugPrint('Wheel item render error: $e');
+                              return Container(key: ValueKey('error_${widget.savedWheels[index].id}'));
+                            }
+                          },
+                        ),
+            ),
+            // Bottom button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+              child: _isReorderMode
+                  ? PushDownButton(
+                      color: const Color(0xFF1E1E2C),
+                      onTap: () {
+                        widget.onReorderModeChanged(false);
+                        setState(() => _isReorderMode = false);
+                      },
+                      height: 58,
+                      bottomBorderColor: Colors.black,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 22),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(LucideIcons.check, color: Colors.white, size: 22),
+                            SizedBox(width: 12),
+                            Text('Done Reordering', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : PushDownButton(
+                      color: const Color(0xFF38BDF8),
+                      onTap: () {
+                        widget.onCreateNewWheel();
+                        Navigator.pop(context);
+                      },
+                      height: 58,
+                      bottomBorderColor: const Color(0xFF0EA5E9),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 22),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(LucideIcons.plus, color: Colors.white, size: 22),
+                            SizedBox(width: 12),
+                            Text('Create New Wheel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );
