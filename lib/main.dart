@@ -822,7 +822,13 @@ class _WheelDemoState extends State<WheelDemo> {
     );
   }
 
-  Widget _buildWheelEditorPanel() {
+  void _closeSheet() {
+    _snappingSheetController.snapToPosition(
+      const SnappingPosition.pixels(positionPixels: -34),
+    );
+  }
+
+  Widget _buildWheelEditorPanel({bool showClose = false}) {
     // Always build so it's ready to display
     // Use _editingWheel if set, otherwise use _currentWheel for sync
     final wheelToEdit = _editingWheel ?? _currentWheel;
@@ -830,6 +836,7 @@ class _WheelDemoState extends State<WheelDemo> {
       key: ValueKey(wheelToEdit?.id ?? 'new'),
       initialConfig: wheelToEdit,
       onPreview: _handleWheelPreview,
+      onClose: showClose ? _closeSheet : null,
     );
   }
 
@@ -1080,50 +1087,22 @@ class _WheelDemoState extends State<WheelDemo> {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD4D4D8),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
-          Positioned(
-            right: 8,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: () {
-                  _snappingSheetController.snapToPosition(
-                    const SnappingPosition.pixels(positionPixels: -34),
-                  );
-                },
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F4F5),
-                    borderRadius: BorderRadius.circular(50),
-                    border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
-                  ),
-                  child: const Icon(LucideIcons.x, size: 14, color: Color(0xFF1E1E2C)),
-                ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4D4D8),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
@@ -1258,7 +1237,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
                       ),
                     ),
-                    child: _buildWheelEditorPanel(),
+                    child: _buildWheelEditorPanel(showClose: true),
                   ),
                 ),
                 // Main content above the sheet
@@ -1353,7 +1332,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         children: [
                           // Settings button (left)
                           Material(
-                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(50),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(50),
@@ -1364,13 +1343,13 @@ class _WheelDemoState extends State<WheelDemo> {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(50),
                                 ),
-                                child: const Icon(LucideIcons.settings, color: Colors.white, size: 22),
+                                child: const Icon(LucideIcons.settings, color: Colors.black, size: 22),
                               ),
                             ),
                           ),
                           // Wheels button (right)
                           Material(
-                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(50),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(50),
@@ -1381,7 +1360,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(50),
                                 ),
-                                child: const Icon(LucideIcons.list, color: Colors.white, size: 22),
+                                child: const Icon(LucideIcons.list, color: Colors.black, size: 22),
                               ),
                             ),
                           ),

@@ -30,6 +30,7 @@ class WheelEditor extends StatefulWidget {
   final Function(WheelConfig)? onSave;
   final VoidCallback? onCancel;
   final Function(WheelConfig)? onPreview;
+  final VoidCallback? onClose;
 
   const WheelEditor({
     super.key,
@@ -37,6 +38,7 @@ class WheelEditor extends StatefulWidget {
     this.onSave,
     this.onCancel,
     this.onPreview,
+    this.onClose,
   });
 
   @override
@@ -55,6 +57,7 @@ class _WheelEditorState extends State<WheelEditor> {
   late bool _showBackgroundCircle;
   late double _centerMarkerSize;
   int? _editingColorIndex;
+  int? _expandedSegmentIndex;
   Timer? _keyRepeatTimer;
   Timer? _previewDebounceTimer;
   final Map<String, TextEditingController> _weightControllers = {};
@@ -475,9 +478,29 @@ class _WheelEditorState extends State<WheelEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.initialConfig != null ? 'Edit Wheel' : 'Create Wheel',
-            style: Theme.of(context).textTheme.headlineMedium,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.initialConfig != null ? 'Edit Wheel' : 'Create Wheel',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              if (widget.onClose != null)
+                GestureDetector(
+                  onTap: widget.onClose,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F4F5),
+                      borderRadius: BorderRadius.circular(50),
+                      border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                    ),
+                    child: const Icon(LucideIcons.x, size: 16, color: Color(0xFF1E1E2C)),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 18),
           TextField(
