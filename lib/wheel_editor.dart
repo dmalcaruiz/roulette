@@ -56,13 +56,13 @@ class _WheelEditorState extends State<WheelEditor> {
   late double _strokeWidth;
   late bool _showBackgroundCircle;
   late double _centerMarkerSize;
-  int? _editingColorIndex;
   int? _expandedSegmentIndex;
   Timer? _keyRepeatTimer;
   Timer? _previewDebounceTimer;
   final Map<String, TextEditingController> _weightControllers = {};
   final Map<String, TextEditingController> _segmentTextControllers = {};
   final Map<String, TextEditingController> _hexControllers = {};
+  final Map<String, FocusNode> _segmentFocusNodes = {};
   late TextEditingController _textSizeController;
   late TextEditingController _headerTextSizeController;
   late TextEditingController _imageSizeController;
@@ -174,6 +174,9 @@ class _WheelEditorState extends State<WheelEditor> {
     for (var controller in _segmentTextControllers.values) {
       controller.dispose();
     }
+    for (var node in _segmentFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -237,6 +240,9 @@ class _WheelEditorState extends State<WheelEditor> {
         _segmentTextControllers.remove(segment.id);
         _hexControllers[segment.id]?.dispose();
         _hexControllers.remove(segment.id);
+        _segmentFocusNodes[segment.id]?.dispose();
+        _segmentFocusNodes.remove(segment.id);
+        _expandedSegmentIndex = null;
       });
       _updatePreview(immediate: true);
     } else {
@@ -270,14 +276,93 @@ class _WheelEditorState extends State<WheelEditor> {
       }
       final segment = _segments.removeAt(oldIndex);
       _segments.insert(newIndex, segment);
+      _expandedSegmentIndex = null;
     });
     _updatePreview(immediate: true);
   }
 
   void _pickColor(int index) {
-    setState(() {
-      _editingColorIndex = _editingColorIndex == index ? null : index;
-    });
+    final segment = _segments[index];
+    // Non-modal bottom sheet so the wheel is still visible behind
+    showBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      enableDrag: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          // Calculate height: parent sheet snap (460) - 24
+          final sheetHeight = 460.0 - 24.0;
+          return Container(
+            height: sheetHeight,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              boxShadow: [
+                BoxShadow(color: Color(0x22000000), blurRadius: 16, offset: Offset(0, -4)),
+              ],
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 14),
+                Container(
+                  width: 48, height: 5,
+                  decoration: BoxDecoration(color: const Color(0xFFD4D4D8), borderRadius: BorderRadius.circular(3)),
+                ),
+                const SizedBox(height: 16),
+                const Text('Segment Color', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: Column(
+                      children: [
+                        ColorPicker(
+                          color: segment.color,
+                          onColorChanged: (Color color) {
+                            setState(() {
+                              segment.color = color;
+                              _hexControllers[segment.id]?.text = _colorToHex(color);
+                            });
+                            setSheetState(() {});
+                            _updatePreview();
+                          },
+                          wheelDiameter: 220,
+                          wheelWidth: 22,
+                          enableShadesSelection: false,
+                          pickersEnabled: const <ColorPickerType, bool>{
+                            ColorPickerType.both: false,
+                            ColorPickerType.primary: false,
+                            ColorPickerType.accent: false,
+                            ColorPickerType.wheel: true,
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _hexControllers.putIfAbsent(
+                            segment.id,
+                            () => TextEditingController(text: _colorToHex(segment.color)),
+                          ),
+                          maxLength: 6,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          onSubmitted: (value) {
+                            final c = _hexToColor(value);
+                            if (c != null) {
+                              setState(() => segment.color = c);
+                              setSheetState(() {});
+                              _updatePreview();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _openVisualConfigSheet(int index) {
@@ -357,45 +442,6 @@ class _WheelEditorState extends State<WheelEditor> {
     );
     widget.onPreview!(config);
   }
-
-  Widget _buildHSBSlider(
-    String label,
-    double value,
-    double min,
-    double max,
-    ValueChanged<double> onChanged,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          Expanded(
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              onChanged: onChanged,
-            ),
-          ),
-          SizedBox(
-            width: 50,
-            child: Text(
-              max == 1 ? value.toStringAsFixed(2) : value.toStringAsFixed(0),
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
 
 
   void _openSettingsSheet() {
@@ -495,7 +541,6 @@ class _WheelEditorState extends State<WheelEditor> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF4F4F5),
                       borderRadius: BorderRadius.circular(50),
-                      border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
                     ),
                     child: const Icon(LucideIcons.x, size: 16, color: Color(0xFF1E1E2C)),
                   ),
@@ -527,12 +572,9 @@ class _WheelEditorState extends State<WheelEditor> {
             buildDefaultDragHandles: false,
             itemCount: _segments.length,
             proxyDecorator: (child, index, animation) {
-              return Transform.scale(
-                scale: 1.1,
-                child: Material(
-                  color: Colors.transparent,
-                  child: child,
-                ),
+              return Material(
+                color: Colors.transparent,
+                child: child,
               );
             },
             onReorder: (oldIndex, newIndex) {
@@ -545,237 +587,321 @@ class _WheelEditorState extends State<WheelEditor> {
             itemBuilder: (context, index) {
               try {
                 final segment = _segments[index];
-                final card = ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                final isExpanded = _expandedSegmentIndex == index;
+
+                final card = AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  decoration: BoxDecoration(
+                    color: isExpanded ? Colors.white : segment.color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isExpanded ? segment.color : Colors.transparent,
+                      width: 3,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      // ── Collapsed row (always visible) ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Color swatch
-                            GestureDetector(
-                              onTap: () => _pickColor(index),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: segment.color,
-                                  borderRadius: BorderRadius.circular(12),
+                            // Drag handle — immediate drag start
+                            ReorderableDragStartListener(
+                              index: index,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Icon(
+                                  LucideIcons.gripVertical,
+                                  size: 22,
+                                  color: isExpanded
+                                      ? const Color(0xFF1E1E2C).withValues(alpha: 0.3)
+                                      : Colors.white.withValues(alpha: 0.6),
                                 ),
-                                child: const Icon(LucideIcons.palette, color: Colors.white, size: 20),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            // Name field
                             Expanded(
-                              child: RepaintBoundary(
-                                child: Builder(
-                                  builder: (context) {
-                                    try {
-                                      return TextField(
-                                        controller: _segmentTextControllers[segment.id],
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                        decoration: const InputDecoration(
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: isExpanded
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          _expandedSegmentIndex = index;
+                                        });
+                                        if (!(Platform.isAndroid || Platform.isIOS)) {
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            _segmentFocusNodes[segment.id]?.requestFocus();
+                                          });
+                                        }
+                                      },
+                                child: IgnorePointer(
+                                  ignoring: !isExpanded,
+                                  child: TextField(
+                                    controller: _segmentTextControllers[segment.id],
+                                    focusNode: _segmentFocusNodes.putIfAbsent(segment.id, () => FocusNode()),
+                                    maxLines: 1,
+                                    cursorColor: isExpanded ? null : Colors.transparent,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color: isExpanded ? const Color(0xFF1E1E2C) : Colors.white,
+                                    ),
+                                    decoration: InputDecoration(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                      hintText: 'Segment name',
+                                      hintStyle: TextStyle(
+                                        color: isExpanded
+                                            ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
+                                            : Colors.white.withValues(alpha: 0.6),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: isExpanded ? const Color(0xFFD4D4D8) : Colors.transparent,
+                                          width: 1.5,
                                         ),
-                                        enableInteractiveSelection: _editingColorIndex != null || true,
-                                        onChanged: (value) {
-                                          try {
-                                            segment.text = value;
-                                            _updatePreview();
-                                          } catch (e) {
-                                            debugPrint('Error updating segment text: $e');
-                                          }
-                                        },
-                                      );
-                                    } catch (e) {
-                                      debugPrint('Error building TextField: $e');
-                                      return Container();
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            _segIconBtn(
-                              segment.imagePath != null ? LucideIcons.image : segment.iconName != null ? LucideIcons.smile : LucideIcons.imagePlus,
-                              () => _openVisualConfigSheet(index),
-                              active: segment.imagePath != null || segment.iconName != null,
-                            ),
-                          ],
-                        ),
-                        if (_editingColorIndex == index) ...[
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF4F4F5),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Column(
-                              children: [
-                                ColorPicker(
-                                  color: segment.color,
-                                  onColorChanged: (Color color) {
-                                    setState(() {
-                                      segment.color = color;
-                                      _hexControllers[segment.id]?.text = _colorToHex(color);
-                                    });
-                                    _updatePreview();
-                                  },
-                                  wheelDiameter: 260,
-                                  wheelWidth: 26,
-                                  enableShadesSelection: false,
-                                  pickersEnabled: const <ColorPickerType, bool>{
-                                    ColorPickerType.both: false,
-                                    ColorPickerType.primary: false,
-                                    ColorPickerType.accent: false,
-                                    ColorPickerType.wheel: true,
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                TextField(
-                                  controller: _hexControllers.putIfAbsent(
-                                    segment.id,
-                                    () => TextEditingController(text: _colorToHex(segment.color)),
-                                  ),
-                                  maxLength: 6,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                  onSubmitted: (value) {
-                                    final c = _hexToColor(value);
-                                    if (c != null) {
-                                      setState(() => segment.color = c);
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: isExpanded ? const Color(0xFF38BDF8) : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: isExpanded ? const Color(0xFFF8F8F9) : Colors.transparent,
+                                    ),
+                                    onChanged: (value) {
+                                      segment.text = value;
                                       _updatePreview();
-                                    }
-                                  },
-                                ),
-                                const SizedBox(height: 8),
-                                _buildHSBSlider('Hue', HSVColor.fromColor(segment.color).hue, 0, 360, (value) {
-                                  final hsv = HSVColor.fromColor(segment.color);
-                                  setState(() => segment.color = hsv.withHue(value).toColor());
-                                  _updatePreview();
-                                }),
-                                _buildHSBSlider('Saturation', HSVColor.fromColor(segment.color).saturation, 0, 1, (value) {
-                                  final hsv = HSVColor.fromColor(segment.color);
-                                  setState(() => segment.color = hsv.withSaturation(value).toColor());
-                                  _updatePreview();
-                                }),
-                                _buildHSBSlider('Brightness', HSVColor.fromColor(segment.color).value, 0, 1, (value) {
-                                  final hsv = HSVColor.fromColor(segment.color);
-                                  setState(() => segment.color = hsv.withValue(value).toColor());
-                                  _updatePreview();
-                                }),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Text('Weight', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5))),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Slider(
-                                value: segment.weight,
-                                min: 0.1,
-                                max: 10.0,
-                                divisions: 200,
-                                label: segment.weight.toStringAsFixed(1),
-                                onChanged: (value) {
-                                  setState(() {
-                                    segment.weight = value;
-                                    _weightControllers[segment.id]?.text = value.toStringAsFixed(1);
-                                  });
-                                  _updatePreview();
-                                },
-                              ),
-                            ),
-                            SizedBox(
-                              width: 56,
-                              child: RepaintBoundary(
-                                child: Focus(
-                                  onKeyEvent: (node, event) {
-                                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                                      if (event is KeyDownEvent) {
-                                        if (_keyRepeatTimer == null) {
-                                          _startKeyRepeat(() {
-                                            setState(() {
-                                              segment.weight = (segment.weight + 0.05).clamp(0.1, 10.0);
-                                              _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                            });
-                                            _updatePreview();
-                                          });
-                                        }
-                                        return KeyEventResult.handled;
-                                      } else if (event is KeyUpEvent) {
-                                        _stopKeyRepeat();
-                                        return KeyEventResult.handled;
-                                      }
-                                    } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                                      if (event is KeyDownEvent) {
-                                        if (_keyRepeatTimer == null) {
-                                          _startKeyRepeat(() {
-                                            setState(() {
-                                              segment.weight = (segment.weight - 0.05).clamp(0.1, 10.0);
-                                              _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                            });
-                                            _updatePreview();
-                                          });
-                                        }
-                                        return KeyEventResult.handled;
-                                      } else if (event is KeyUpEvent) {
-                                        _stopKeyRepeat();
-                                        return KeyEventResult.handled;
-                                      }
-                                    }
-                                    return KeyEventResult.ignored;
-                                  },
-                                  child: Builder(
-                                    builder: (context) {
-                                      try {
-                                        return TextField(
-                                          controller: _weightControllers[segment.id],
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                          decoration: const InputDecoration(
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                          ),
-                                          enableInteractiveSelection: _editingColorIndex != null || true,
-                                          onChanged: (value) {
-                                            try {
-                                              final newValue = double.tryParse(value);
-                                              if (newValue != null && newValue >= 0.05 && newValue <= 10.0) {
-                                                segment.weight = newValue;
-                                                _updatePreview();
-                                              }
-                                            } catch (e) {
-                                              debugPrint('Error updating weight: $e');
-                                            }
-                                          },
-                                        );
-                                      } catch (e) {
-                                        debugPrint('Error building weight TextField: $e');
-                                        return Container();
-                                      }
                                     },
                                   ),
                                 ),
                               ),
                             ),
+                            // Chevron
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                setState(() {
+                                  _expandedSegmentIndex = isExpanded ? null : index;
+                                });
+                                if (!isExpanded && !(Platform.isAndroid || Platform.isIOS)) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    _segmentFocusNodes[segment.id]?.requestFocus();
+                                  });
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                                child: AnimatedRotation(
+                                  turns: isExpanded ? 0.5 : 0.0,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Icon(
+                                    LucideIcons.chevronDown,
+                                    size: 26,
+                                    color: isExpanded
+                                        ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
+                                        : Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      // ── Expanded editing content ──
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        child: isExpanded
+                            ? Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                                child: Column(
+                                  children: [
+                                    // Row 1: Weight slider
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Weight',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Slider(
+                                            value: segment.weight,
+                                            min: 0.1,
+                                            max: 10.0,
+                                            divisions: 200,
+                                            label: segment.weight.toStringAsFixed(1),
+                                            onChanged: (value) {
+                                              setState(() {
+                                                segment.weight = value;
+                                                _weightControllers[segment.id]?.text = value.toStringAsFixed(1);
+                                              });
+                                              _updatePreview();
+                                            },
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 52,
+                                          child: RepaintBoundary(
+                                            child: Focus(
+                                              onKeyEvent: (node, event) {
+                                                if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                                  if (event is KeyDownEvent) {
+                                                    if (_keyRepeatTimer == null) {
+                                                      _startKeyRepeat(() {
+                                                        setState(() {
+                                                          segment.weight = (segment.weight + 0.05).clamp(0.1, 10.0);
+                                                          _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                                        });
+                                                        _updatePreview();
+                                                      });
+                                                    }
+                                                    return KeyEventResult.handled;
+                                                  } else if (event is KeyUpEvent) {
+                                                    _stopKeyRepeat();
+                                                    return KeyEventResult.handled;
+                                                  }
+                                                } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                                  if (event is KeyDownEvent) {
+                                                    if (_keyRepeatTimer == null) {
+                                                      _startKeyRepeat(() {
+                                                        setState(() {
+                                                          segment.weight = (segment.weight - 0.05).clamp(0.1, 10.0);
+                                                          _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                                        });
+                                                        _updatePreview();
+                                                      });
+                                                    }
+                                                    return KeyEventResult.handled;
+                                                  } else if (event is KeyUpEvent) {
+                                                    _stopKeyRepeat();
+                                                    return KeyEventResult.handled;
+                                                  }
+                                                }
+                                                return KeyEventResult.ignored;
+                                              },
+                                              child: TextField(
+                                                controller: _weightControllers[segment.id],
+                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                                decoration: const InputDecoration(
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                                ),
+                                                onChanged: (value) {
+                                                  final newValue = double.tryParse(value);
+                                                  if (newValue != null && newValue >= 0.05 && newValue <= 10.0) {
+                                                    segment.weight = newValue;
+                                                    _updatePreview();
+                                                  }
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    // Row 3: Icon + Color split
+                                    Row(
+                                      children: [
+                                        // Icon / Image button
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: () => _openVisualConfigSheet(index),
+                                            child: Container(
+                                              height: 44,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF4F4F5),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    segment.imagePath != null
+                                                        ? LucideIcons.image
+                                                        : segment.iconName != null
+                                                            ? LucideIcons.smile
+                                                            : LucideIcons.imagePlus,
+                                                    size: 18,
+                                                    color: (segment.imagePath != null || segment.iconName != null)
+                                                        ? const Color(0xFF38BDF8)
+                                                        : const Color(0xFF1E1E2C).withValues(alpha: 0.45),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Icon',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: const Color(0xFF1E1E2C).withValues(alpha: 0.6),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        // Color button
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: () => _pickColor(index),
+                                            child: Container(
+                                              height: 44,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF4F4F5),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Container(
+                                                    width: 18,
+                                                    height: 18,
+                                                    decoration: BoxDecoration(
+                                                      color: segment.color,
+                                                      borderRadius: BorderRadius.circular(5),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Color',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: const Color(0xFF1E1E2C).withValues(alpha: 0.6),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
-                ),
                 );
 
                 final swipeableCard = SwipeableActionCell(
@@ -795,25 +921,11 @@ class _WheelEditorState extends State<WheelEditor> {
                   child: card,
                 );
 
-                final itemContent = Column(
-                  children: [
-                    swipeableCard,
-                    const SizedBox(height: 10),
-                  ],
+                return Padding(
+                  key: ValueKey(segment.id),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: swipeableCard,
                 );
-
-                if (_editingColorIndex == null) {
-                  return ReorderableDelayedDragStartListener(
-                    key: ValueKey(segment.id),
-                    index: index,
-                    child: itemContent,
-                  );
-                } else {
-                  return Container(
-                    key: ValueKey(segment.id),
-                    child: itemContent,
-                  );
-                }
               } catch (e) {
                 debugPrint('Segment render error: $e');
                 return Container(key: ValueKey('error_${_segments[index].id}'));
@@ -880,19 +992,6 @@ class _WheelEditorState extends State<WheelEditor> {
     );
   }
 
-  Widget _segIconBtn(IconData icon, VoidCallback onTap, {Color color = const Color(0xFF1E1E2C), bool active = false}) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(7),
-          child: Icon(icon, size: 24, color: active ? const Color(0xFF38BDF8) : color),
-        ),
-      ),
-    );
-  }
 }
 
 class _SegmentData {

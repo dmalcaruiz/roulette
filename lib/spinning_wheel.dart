@@ -60,6 +60,7 @@ class SpinningWheelState extends State<SpinningWheel>
   int _currentAudioIndex = 0;
   static const int _poolSize = 300; // Increased pool size for intense spinning
   bool _isSpinning = false;
+  bool get isSpinning => _isSpinning;
   bool _isResetting = false;
   bool _isPullingBack = false;
   double _currentRotation = 0;

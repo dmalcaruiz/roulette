@@ -1267,7 +1267,14 @@ class _WheelDemoState extends State<WheelDemo> {
                                 Expanded(
                                   child: Center(
                                     child: (_previewWheel != null || _currentWheel != null)
-                                      ? RepaintBoundary(
+                                      ? GestureDetector(
+                                          onTap: () {
+                                            if (sheetHeight >= midSnapHeight - 50 &&
+                                                (_wheelKey.currentState?.isSpinning ?? false)) {
+                                              _wheelKey.currentState?.reset();
+                                            }
+                                          },
+                                          child: RepaintBoundary(
                                           child: SpinningWheel(
                                             key: _wheelKey,
                                             items: (_previewWheel ?? _currentWheel)!.items,
@@ -1287,6 +1294,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                             showWinAnimation: _showWinAnimation,
                                             headerOpacity: headerOpacity,
                                           ),
+                                        ),
                                         )
                                       : Text(
                                           'No wheel selected',
