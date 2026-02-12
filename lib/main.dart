@@ -1120,14 +1120,74 @@ class _WheelDemoState extends State<WheelDemo> {
     if (isMobile) {
       // Mobile layout: SnappingSheet with dynamic wheel resizing
       final screenHeight = MediaQuery.of(context).size.height;
-      final safeTop = MediaQuery.of(context).padding.top;
-      final safeBottom = MediaQuery.of(context).padding.bottom;
 
       return Scaffold(
-        body: Container(
-          color: _backgroundColor,
-          child: Stack(
-            children: [
+        body: SafeArea(
+          child: Container(
+            color: _backgroundColor,
+            child: Stack(
+              children: [
+                // Fixed spin controls at screen bottom (behind wheel in z-order)
+                if (_previewWheel != null || _currentWheel != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 10,
+                  child: Row(
+                    children: [
+                      PushDownButton(
+                        color: const Color(0xFFAE01CB),
+                        onTap: () => _wheelKey.currentState?.reset(),
+                        height: 64,
+                        bottomBorderColor: const Color(0xFF8A009F),
+                        child: const SizedBox(
+                          width: 59,
+                          child: Center(
+                            child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: PushDownButton(
+                          color: const Color(0xFF38BDF8),
+                          onTap: () => _wheelKey.currentState?.spin(),
+                          height: 64,
+                          bottomBorderColor: const Color(0xFF0EA5E9),
+                          child: const Center(
+                            child: Text(
+                              'SPIN',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      PushDownButton(
+                        color: const Color(0xFF1E1E2C),
+                        onTap: () {
+                          _openCurrentWheelEditor();
+                          _snappingSheetController.snapToPosition(
+                            const SnappingPosition.pixels(positionPixels: 350),
+                          );
+                        },
+                        height: 64,
+                        bottomBorderColor: Colors.black,
+                        child: const SizedBox(
+                          width: 59,
+                          child: Center(
+                            child: Icon(LucideIcons.pencil, color: Colors.white, size: 28),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               SnappingSheet(
                 controller: _snappingSheetController,
                 lockOverflowDrag: true,
@@ -1163,116 +1223,54 @@ class _WheelDemoState extends State<WheelDemo> {
                   ),
                 ),
                 // Main content above the sheet
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      // Dynamic wheel area that resizes with sheet
-                      ValueListenableBuilder<double>(
-                        valueListenable: _currentSheetHeight,
-                        builder: (context, sheetHeight, _) {
-                          final availableHeight = screenHeight - safeTop - safeBottom - sheetHeight - _grabbingHeight + 45;
+                child: Column(
+                  children: [
+                    // Dynamic wheel area that resizes with sheet
+                    ValueListenableBuilder<double>(
+                      valueListenable: _currentSheetHeight,
+                      builder: (context, sheetHeight, _) {
+                        final availableHeight = screenHeight - sheetHeight - _grabbingHeight + 45;
                           final maxWheelSize = min(availableHeight - 140, effectiveWheelSize);
                           final clampedWheelSize = maxWheelSize.clamp(80.0, effectiveWheelSize);
                           final dynamicWheelScale = clampedWheelSize / idealWheelSize;
 
-                          return Container(
+                          return SizedBox(
                             height: availableHeight.clamp(200.0, screenHeight),
-                            color: Colors.transparent,
-                            child: SingleChildScrollView(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    if (_previewWheel != null || _currentWheel != null) ...[
-                                      const SizedBox(height: 10),
-                                      RepaintBoundary(
-                                        child: SpinningWheel(
-                                          key: _wheelKey,
-                                          items: (_previewWheel ?? _currentWheel)!.items,
-                                          onFinished: _onWheelFinished,
-                                          size: clampedWheelSize,
-                                          textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize * dynamicWheelScale,
-                                          headerTextSizeMultiplier: (_previewWheel ?? _currentWheel)!.headerTextSize * dynamicWheelScale,
-                                          imageSize: (_previewWheel ?? _currentWheel)!.imageSize * dynamicWheelScale,
-                                          cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius * dynamicWheelScale,
-                                          strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth * dynamicWheelScale,
-                                          showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
-                                          centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize * dynamicWheelScale,
-                                          spinIntensity: _spinIntensity,
-                                          isRandomIntensity: _isRandomIntensity,
-                                          headerTextColor: _textColor,
-                                          overlayColor: _overlayColor,
-                                          showWinAnimation: _showWinAnimation,
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Center(
+                                    child: (_previewWheel != null || _currentWheel != null)
+                                      ? RepaintBoundary(
+                                          child: SpinningWheel(
+                                            key: _wheelKey,
+                                            items: (_previewWheel ?? _currentWheel)!.items,
+                                            onFinished: _onWheelFinished,
+                                            size: clampedWheelSize,
+                                            textSizeMultiplier: (_previewWheel ?? _currentWheel)!.textSize * dynamicWheelScale,
+                                            headerTextSizeMultiplier: (_previewWheel ?? _currentWheel)!.headerTextSize * dynamicWheelScale,
+                                            imageSize: (_previewWheel ?? _currentWheel)!.imageSize * dynamicWheelScale,
+                                            cornerRadius: (_previewWheel ?? _currentWheel)!.cornerRadius * dynamicWheelScale,
+                                            strokeWidth: (_previewWheel ?? _currentWheel)!.strokeWidth * dynamicWheelScale,
+                                            showBackgroundCircle: (_previewWheel ?? _currentWheel)!.showBackgroundCircle,
+                                            centerMarkerSize: (_previewWheel ?? _currentWheel)!.centerMarkerSize * dynamicWheelScale,
+                                            spinIntensity: _spinIntensity,
+                                            isRandomIntensity: _isRandomIntensity,
+                                            headerTextColor: _textColor,
+                                            overlayColor: _overlayColor,
+                                            showWinAnimation: _showWinAnimation,
+                                          ),
+                                        )
+                                      : Text(
+                                          'No wheel selected',
+                                          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      // Compact spin controls: Reset + Spin + Edit
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        child: Row(
-                                          children: [
-                                            PushDownButton(
-                                              color: const Color(0xFFAE01CB),
-                                              onTap: () => _wheelKey.currentState?.reset(),
-                                              height: 64,
-                                              bottomBorderColor: const Color(0xFF8A009F),
-                                              child: const SizedBox(
-                                                width: 59,
-                                                child: Center(
-                                                  child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: PushDownButton(
-                                                color: const Color(0xFF38BDF8),
-                                                onTap: () => _wheelKey.currentState?.spin(),
-                                                height: 64,
-                                                bottomBorderColor: const Color(0xFF0EA5E9),
-                                                child: const Center(
-                                                  child: Text(
-                                                    'SPIN',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 24,
-                                                      fontWeight: FontWeight.w800,
-                                                      letterSpacing: 2,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            PushDownButton(
-                                              color: const Color(0xFF1E1E2C),
-                                              onTap: () {
-                                                _openCurrentWheelEditor();
-                                                _snappingSheetController.snapToPosition(
-                                                  const SnappingPosition.pixels(positionPixels: 350),
-                                                );
-                                              },
-                                              height: 64,
-                                              bottomBorderColor: Colors.black,
-                                              child: const SizedBox(
-                                                width: 59,
-                                                child: Center(
-                                                  child: Icon(LucideIcons.pencil, color: Colors.white, size: 28),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                    ] else
-                                      Text(
-                                        'No wheel selected',
-                                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                  ],
+                                  ),
                                 ),
+                                const SizedBox(height: 60),
+                              ],
                             ),
                           );
                         },
@@ -1280,17 +1278,14 @@ class _WheelDemoState extends State<WheelDemo> {
                     ],
                   ),
                 ),
-              ),
               // Transparent app bar
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // Settings button (left)
@@ -1331,17 +1326,18 @@ class _WheelDemoState extends State<WheelDemo> {
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
-      );
+      ),
+    );
     }
 
     // Desktop layout: side-by-side
     return Scaffold(
-      body: Row(
-        children: [
+      body: SafeArea(
+        child: Row(
+          children: [
           // Left sidebar
           Container(
             width: 400,
@@ -1477,6 +1473,7 @@ class _WheelDemoState extends State<WheelDemo> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
