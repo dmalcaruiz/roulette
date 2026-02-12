@@ -24,6 +24,7 @@ class SpinningWheel extends StatefulWidget {
   final Color headerTextColor;
   final Color overlayColor;
   final bool showWinAnimation;
+  final double headerOpacity;
 
   const SpinningWheel({
     super.key,
@@ -42,6 +43,7 @@ class SpinningWheel extends StatefulWidget {
     this.headerTextColor = Colors.black,
     this.overlayColor = Colors.black,
     this.showWinAnimation = true,
+    this.headerOpacity = 1.0,
   });
 
   @override
@@ -567,15 +569,20 @@ class SpinningWheelState extends State<SpinningWheel>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          _currentSegment,
-          style: TextStyle(
-            fontSize: 56 * widget.headerTextSizeMultiplier,
-            fontWeight: FontWeight.w700,
-            color: widget.headerTextColor,
+        Opacity(
+          opacity: widget.headerOpacity,
+          child: SizedBox(
+            height: (56 * widget.headerTextSizeMultiplier + 16) * widget.headerOpacity,
+            child: Text(
+              _currentSegment,
+              style: TextStyle(
+                fontSize: 56 * widget.headerTextSizeMultiplier,
+                fontWeight: FontWeight.w700,
+                color: widget.headerTextColor,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 16),
         Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
@@ -584,6 +591,7 @@ class SpinningWheelState extends State<SpinningWheel>
               width: widget.size,
               height: widget.size,
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: spin,
                 child: CustomPaint(
                   painter: WheelPainter(

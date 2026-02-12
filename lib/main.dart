@@ -193,7 +193,8 @@ class _WheelDemoState extends State<WheelDemo> {
   // Snapping sheet controls (mobile)
   final SnappingSheetController _snappingSheetController = SnappingSheetController();
   final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
-  static const double _grabbingHeight = 28.0;
+  static const double _grabbingHeight = 30.0;
+  static const double _bottomControlsHeight = 60.0;
 
   // Preset templates (mutable for reordering)
   final List<WheelConfig> _presets = [
@@ -1079,20 +1080,49 @@ class _WheelDemoState extends State<WheelDemo> {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          const SizedBox(height: 12),
-          // Drag indicator bar
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: const Color(0xFFD4D4D8),
-              borderRadius: BorderRadius.circular(2),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4D4D8),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  _snappingSheetController.snapToPosition(
+                    const SnappingPosition.pixels(positionPixels: -34),
+                  );
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F4F5),
+                    borderRadius: BorderRadius.circular(50),
+                    border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                  ),
+                  child: const Icon(LucideIcons.x, size: 14, color: Color(0xFF1E1E2C)),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1120,6 +1150,10 @@ class _WheelDemoState extends State<WheelDemo> {
     if (isMobile) {
       // Mobile layout: SnappingSheet with dynamic wheel resizing
       final screenHeight = MediaQuery.of(context).size.height;
+      final safePadding = MediaQuery.of(context).padding;
+      final safeAreaHeight = screenHeight - safePadding.top - safePadding.bottom;
+      final upperSnapHeight = safeAreaHeight - 16;
+      const midSnapHeight = 460.0;
 
       return Scaffold(
         body: SafeArea(
@@ -1173,7 +1207,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         onTap: () {
                           _openCurrentWheelEditor();
                           _snappingSheetController.snapToPosition(
-                            const SnappingPosition.pixels(positionPixels: 350),
+                            const SnappingPosition.pixels(positionPixels: 460),
                           );
                         },
                         height: 64,
@@ -1191,17 +1225,22 @@ class _WheelDemoState extends State<WheelDemo> {
               SnappingSheet(
                 controller: _snappingSheetController,
                 lockOverflowDrag: true,
-                snappingPositions: const [
-                  SnappingPosition.pixels(
-                    positionPixels: 6,
+                snappingPositions: [
+                  const SnappingPosition.pixels(
+                    positionPixels: -34,
                     snappingCurve: Curves.easeOutExpo,
                     snappingDuration: Duration(milliseconds: 900),
                     grabbingContentOffset: GrabbingContentOffset.top,
                   ),
-                  SnappingPosition.pixels(
-                    positionPixels: 350,
+                  const SnappingPosition.pixels(
+                    positionPixels: 460,
                     snappingCurve: Curves.easeOutExpo,
                     snappingDuration: Duration(milliseconds: 900),
+                  ),
+                  SnappingPosition.pixels(
+                    positionPixels: upperSnapHeight,
+                    snappingCurve: Curves.easeOutExpo,
+                    snappingDuration: const Duration(milliseconds: 900),
                   ),
                 ],
                 onSheetMoved: (positionData) {
@@ -1230,12 +1269,20 @@ class _WheelDemoState extends State<WheelDemo> {
                       valueListenable: _currentSheetHeight,
                       builder: (context, sheetHeight, _) {
                         final availableHeight = screenHeight - sheetHeight - _grabbingHeight + 45;
-                          final maxWheelSize = min(availableHeight - 140, effectiveWheelSize);
+                          final spacerProgress = (sheetHeight / midSnapHeight).clamp(0.0, 1.0);
+                          final spacerHeight = _bottomControlsHeight * (1.0 - spacerProgress);
+                          final headerOpacity = 1.0 - spacerProgress;
+                          final estimatedHeaderHeight = 72.0 * headerOpacity;
+                          final wheelPadding = 140.0 - 80.0 * spacerProgress;
+                          final maxWheelSize = min(availableHeight - wheelPadding - estimatedHeaderHeight, effectiveWheelSize);
                           final clampedWheelSize = maxWheelSize.clamp(80.0, effectiveWheelSize);
                           final dynamicWheelScale = clampedWheelSize / idealWheelSize;
+                          final wheelOpacity = 1.0 - (2.0 * (sheetHeight - midSnapHeight) / (upperSnapHeight - midSnapHeight)).clamp(0.0, 1.0);
 
-                          return SizedBox(
-                            height: availableHeight.clamp(200.0, screenHeight),
+                          return Opacity(
+                            opacity: wheelOpacity,
+                            child: SizedBox(
+                            height: availableHeight.clamp(200.0, safeAreaHeight - _bottomControlsHeight),
                             child: Column(
                               children: [
                                 Expanded(
@@ -1259,6 +1306,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                             headerTextColor: _textColor,
                                             overlayColor: _overlayColor,
                                             showWinAnimation: _showWinAnimation,
+                                            headerOpacity: headerOpacity,
                                           ),
                                         )
                                       : Text(
@@ -1269,9 +1317,10 @@ class _WheelDemoState extends State<WheelDemo> {
                                         ),
                                   ),
                                 ),
-                                const SizedBox(height: 60),
+                                SizedBox(height: spacerHeight),
                               ],
                             ),
+                          ),
                           );
                         },
                       ),
@@ -1283,46 +1332,61 @@ class _WheelDemoState extends State<WheelDemo> {
                 top: 0,
                 left: 0,
                 right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Settings button (left)
-                        Material(
-                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(50),
-                          child: InkWell(
+                child: ValueListenableBuilder<double>(
+                  valueListenable: _currentSheetHeight,
+                  builder: (context, sheetHeight, child) {
+                    final headerProgress = (sheetHeight / midSnapHeight).clamp(0.0, 1.0);
+                    final headerOpacity = 1.0 - headerProgress;
+                    final headerHeight = 54.0 * (1.0 - headerProgress);
+                    return Opacity(
+                      opacity: headerOpacity,
+                      child: SizedBox(
+                        height: headerHeight,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Settings button (left)
+                          Material(
+                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(50),
-                            onTap: _openGearMenu,
-                            child: Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(50),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(50),
+                              onTap: _openGearMenu,
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(50),
+                                ),
+                                child: const Icon(LucideIcons.settings, color: Colors.white, size: 22),
                               ),
-                              child: const Icon(LucideIcons.settings, color: Colors.white, size: 22),
                             ),
                           ),
-                        ),
-                        // Wheels button (right)
-                        Material(
-                          color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(50),
-                          child: InkWell(
+                          // Wheels button (right)
+                          Material(
+                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(50),
-                            onTap: _openWheelsScreen,
-                            child: Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(50),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(50),
+                              onTap: _openWheelsScreen,
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(50),
+                                ),
+                                child: const Icon(LucideIcons.list, color: Colors.white, size: 22),
                               ),
-                              child: const Icon(LucideIcons.list, color: Colors.white, size: 22),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
