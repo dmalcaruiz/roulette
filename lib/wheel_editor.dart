@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -589,7 +588,23 @@ class _WheelEditorState extends State<WheelEditor> {
                 final segment = _segments[index];
                 final isExpanded = _expandedSegmentIndex == index;
 
-                final card = AnimatedContainer(
+                final card = GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expandedSegmentIndex = null;
+                      } else {
+                        _expandedSegmentIndex = index;
+                        if (!(Platform.isAndroid || Platform.isIOS)) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _segmentFocusNodes[segment.id]?.requestFocus();
+                          });
+                        }
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
                   decoration: BoxDecoration(
@@ -606,209 +621,206 @@ class _WheelEditorState extends State<WheelEditor> {
                       // ── Collapsed row (always visible) ──
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: IntrinsicHeight(
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Drag handle — immediate drag start
+                            // Drag handle — stretches full row height
                             ReorderableDragStartListener(
                               index: index,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(
-                                  LucideIcons.gripVertical,
-                                  size: 22,
-                                  color: isExpanded
-                                      ? const Color(0xFF1E1E2C).withValues(alpha: 0.3)
-                                      : Colors.white.withValues(alpha: 0.6),
+                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                child: Center(
+                                  child: Icon(
+                                    LucideIcons.gripVertical,
+                                    size: 22,
+                                    color: isExpanded
+                                        ? const Color(0xFF1E1E2C).withValues(alpha: 0.3)
+                                        : Colors.white.withValues(alpha: 0.6),
+                                  ),
                                 ),
                               ),
                             ),
                             // Name field
                             Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: isExpanded
-                                    ? null
-                                    : () {
-                                        setState(() {
-                                          _expandedSegmentIndex = index;
-                                        });
-                                        if (!(Platform.isAndroid || Platform.isIOS)) {
-                                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                                            _segmentFocusNodes[segment.id]?.requestFocus();
-                                          });
-                                        }
-                                      },
-                                child: IgnorePointer(
-                                  ignoring: !isExpanded,
-                                  child: TextField(
-                                    controller: _segmentTextControllers[segment.id],
-                                    focusNode: _segmentFocusNodes.putIfAbsent(segment.id, () => FocusNode()),
-                                    maxLines: 1,
-                                    cursorColor: isExpanded ? null : Colors.transparent,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                      color: isExpanded ? const Color(0xFF1E1E2C) : Colors.white,
-                                    ),
-                                    decoration: InputDecoration(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                      hintText: 'Segment name',
-                                      hintStyle: TextStyle(
-                                        color: isExpanded
-                                            ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
-                                            : Colors.white.withValues(alpha: 0.6),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: isExpanded ? const Color(0xFFD4D4D8) : Colors.transparent,
-                                          width: 1.5,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: isExpanded ? const Color(0xFF38BDF8) : Colors.transparent,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      filled: true,
-                                      fillColor: isExpanded ? const Color(0xFFF8F8F9) : Colors.transparent,
-                                    ),
-                                    onChanged: (value) {
-                                      segment.text = value;
-                                      _updatePreview();
-                                    },
+                              child: IgnorePointer(
+                                ignoring: !isExpanded,
+                                child: TextField(
+                                  controller: _segmentTextControllers[segment.id],
+                                  focusNode: _segmentFocusNodes.putIfAbsent(segment.id, () => FocusNode()),
+                                  maxLines: 1,
+                                  cursorColor: isExpanded ? null : Colors.transparent,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: isExpanded ? const Color(0xFF1E1E2C) : Colors.white,
                                   ),
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    hintText: 'Segment name',
+                                    hintStyle: TextStyle(
+                                      color: isExpanded
+                                          ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
+                                          : Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: isExpanded ? const Color(0xFFD4D4D8) : Colors.transparent,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: isExpanded ? const Color(0xFF38BDF8) : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: isExpanded ? const Color(0xFFF8F8F9) : Colors.transparent,
+                                  ),
+                                  onChanged: (value) {
+                                    segment.text = value;
+                                    _updatePreview();
+                                  },
                                 ),
                               ),
                             ),
                             // Chevron
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                setState(() {
-                                  _expandedSegmentIndex = isExpanded ? null : index;
-                                });
-                                if (!isExpanded && !(Platform.isAndroid || Platform.isIOS)) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    _segmentFocusNodes[segment.id]?.requestFocus();
-                                  });
-                                }
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-                                child: AnimatedRotation(
-                                  turns: isExpanded ? 0.5 : 0.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: Icon(
-                                    LucideIcons.chevronDown,
-                                    size: 26,
-                                    color: isExpanded
-                                        ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
-                                        : Colors.white.withValues(alpha: 0.6),
-                                  ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                              child: AnimatedRotation(
+                                turns: isExpanded ? 0.5 : 0.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  LucideIcons.chevronDown,
+                                  size: 26,
+                                  color: isExpanded
+                                      ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
+                                      : Colors.white.withValues(alpha: 0.6),
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      ),
                       // ── Expanded editing content ──
                       AnimatedSize(
                         duration: const Duration(milliseconds: 200),
                         curve: Curves.easeOut,
                         child: isExpanded
-                            ? Padding(
+                            ? GestureDetector(
+                                onTap: () {}, // Absorb taps on expanded content so they don't collapse
+                                child: Padding(
                                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                                 child: Column(
                                   children: [
-                                    // Row 1: Weight slider
+                                    // Row 1: Weight with +/- buttons
                                     Row(
                                       children: [
-                                        Text(
-                                          'Weight',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Slider(
-                                            value: segment.weight,
-                                            min: 0.1,
-                                            max: 10.0,
-                                            divisions: 200,
-                                            label: segment.weight.toStringAsFixed(1),
-                                            onChanged: (value) {
+                                        // Minus button
+                                        GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              segment.weight = (segment.weight - 0.1).clamp(0.1, 10.0);
+                                              _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                            });
+                                            _updatePreview();
+                                          },
+                                          onLongPressStart: (_) {
+                                            _startKeyRepeat(() {
                                               setState(() {
-                                                segment.weight = value;
-                                                _weightControllers[segment.id]?.text = value.toStringAsFixed(1);
+                                                segment.weight = (segment.weight - 0.1).clamp(0.1, 10.0);
+                                                _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
                                               });
                                               _updatePreview();
-                                            },
+                                            });
+                                          },
+                                          onLongPressEnd: (_) => _stopKeyRepeat(),
+                                          child: Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF4F4F5),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                                            ),
+                                            child: Icon(LucideIcons.minus, size: 20, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5)),
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: 52,
-                                          child: RepaintBoundary(
-                                            child: Focus(
-                                              onKeyEvent: (node, event) {
-                                                if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                                                  if (event is KeyDownEvent) {
-                                                    if (_keyRepeatTimer == null) {
-                                                      _startKeyRepeat(() {
-                                                        setState(() {
-                                                          segment.weight = (segment.weight + 0.05).clamp(0.1, 10.0);
-                                                          _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                                        });
-                                                        _updatePreview();
-                                                      });
-                                                    }
-                                                    return KeyEventResult.handled;
-                                                  } else if (event is KeyUpEvent) {
-                                                    _stopKeyRepeat();
-                                                    return KeyEventResult.handled;
-                                                  }
-                                                } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                                                  if (event is KeyDownEvent) {
-                                                    if (_keyRepeatTimer == null) {
-                                                      _startKeyRepeat(() {
-                                                        setState(() {
-                                                          segment.weight = (segment.weight - 0.05).clamp(0.1, 10.0);
-                                                          _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                                        });
-                                                        _updatePreview();
-                                                      });
-                                                    }
-                                                    return KeyEventResult.handled;
-                                                  } else if (event is KeyUpEvent) {
-                                                    _stopKeyRepeat();
-                                                    return KeyEventResult.handled;
-                                                  }
-                                                }
-                                                return KeyEventResult.ignored;
-                                              },
-                                              child: TextField(
-                                                controller: _weightControllers[segment.id],
-                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                                decoration: const InputDecoration(
-                                                  contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                                ),
+                                        const SizedBox(width: 8),
+                                        // Weight label + value + slider
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    'Weight',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: const Color(0xFF1E1E2C).withValues(alpha: 0.5),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    segment.weight.toStringAsFixed(1),
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Color(0xFF1E1E2C),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Slider(
+                                                value: segment.weight,
+                                                min: 0.1,
+                                                max: 10.0,
+                                                divisions: 99,
                                                 onChanged: (value) {
-                                                  final newValue = double.tryParse(value);
-                                                  if (newValue != null && newValue >= 0.05 && newValue <= 10.0) {
-                                                    segment.weight = newValue;
-                                                    _updatePreview();
-                                                  }
+                                                  setState(() {
+                                                    segment.weight = value;
+                                                    _weightControllers[segment.id]?.text = value.toStringAsFixed(1);
+                                                  });
+                                                  _updatePreview();
                                                 },
                                               ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        // Plus button
+                                        GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              segment.weight = (segment.weight + 0.1).clamp(0.1, 10.0);
+                                              _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                            });
+                                            _updatePreview();
+                                          },
+                                          onLongPressStart: (_) {
+                                            _startKeyRepeat(() {
+                                              setState(() {
+                                                segment.weight = (segment.weight + 0.1).clamp(0.1, 10.0);
+                                                _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                              });
+                                              _updatePreview();
+                                            });
+                                          },
+                                          onLongPressEnd: (_) => _stopKeyRepeat(),
+                                          child: Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF4F4F5),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
                                             ),
+                                            child: Icon(LucideIcons.plus, size: 20, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5)),
                                           ),
                                         ),
                                       ],
@@ -897,11 +909,13 @@ class _WheelEditorState extends State<WheelEditor> {
                                     ),
                                   ],
                                 ),
+                              ),
                               )
                             : const SizedBox.shrink(),
                       ),
                     ],
                   ),
+                ),
                 );
 
                 final swipeableCard = SwipeableActionCell(
