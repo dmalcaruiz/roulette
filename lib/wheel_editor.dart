@@ -60,6 +60,8 @@ class _WheelEditorState extends State<WheelEditor> {
   late double _strokeWidth;
   late bool _showBackgroundCircle;
   late double _centerMarkerSize;
+  late String _innerCornerStyle;
+  late double _centerInset;
   int? _expandedSegmentIndex;
   int _selectedTabIndex = 0;
   Timer? _keyRepeatTimer;
@@ -104,6 +106,8 @@ class _WheelEditorState extends State<WheelEditor> {
       _strokeWidth = widget.initialConfig!.strokeWidth;
       _showBackgroundCircle = widget.initialConfig!.showBackgroundCircle;
       _centerMarkerSize = widget.initialConfig!.centerMarkerSize;
+      _innerCornerStyle = widget.initialConfig!.innerCornerStyle;
+      _centerInset = widget.initialConfig!.centerInset;
 
       _textSizeController = TextEditingController(text: _textSize.toStringAsFixed(2));
       _headerTextSizeController = TextEditingController(text: _headerTextSize.toStringAsFixed(1));
@@ -146,6 +150,8 @@ class _WheelEditorState extends State<WheelEditor> {
       _strokeWidth = 3.0;
       _showBackgroundCircle = true;
       _centerMarkerSize = 200.0;
+      _innerCornerStyle = 'none';
+      _centerInset = 50.0;
 
       _textSizeController = TextEditingController(text: _textSize.toStringAsFixed(2));
       _headerTextSizeController = TextEditingController(text: _headerTextSize.toStringAsFixed(1));
@@ -442,6 +448,8 @@ class _WheelEditorState extends State<WheelEditor> {
       headerTextSize: _headerTextSize,
       imageSize: _imageSize,
       cornerRadius: _cornerRadius,
+      innerCornerStyle: _innerCornerStyle,
+      centerInset: _centerInset,
       strokeWidth: _strokeWidth,
       showBackgroundCircle: _showBackgroundCircle,
       centerMarkerSize: _centerMarkerSize,
@@ -588,6 +596,43 @@ class _WheelEditorState extends State<WheelEditor> {
         _settingSlider('Header Text', _headerTextSize, 0.05, 2.0, 200, (v) { setState(() { _headerTextSize = v; _headerTextSizeController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
         _settingSlider('Image Size', _imageSize, 20, 150, 130, (v) { setState(() { _imageSize = v; _imageSizeController.text = v.toStringAsFixed(0); }); _updatePreview(); }),
         _settingSlider('Corner Radius', _cornerRadius, 0, 100, 40, (v) { setState(() { _cornerRadius = v; _cornerRadiusController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              const Text('Inner Corners', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF71717A))),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F4F5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
+                ),
+                child: DropdownButton<String>(
+                  value: _innerCornerStyle,
+                  underline: const SizedBox(),
+                  isDense: true,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1E1E2C)),
+                  items: const [
+                    DropdownMenuItem(value: 'none', child: Text('None')),
+                    DropdownMenuItem(value: 'circular', child: Text('Circular')),
+                    DropdownMenuItem(value: 'rounded', child: Text('Rounded')),
+                    DropdownMenuItem(value: 'straight', child: Text('Straight')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _innerCornerStyle = v);
+                      _updatePreview();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_innerCornerStyle != 'none')
+          _settingSlider('Center Inset', _centerInset, 0, 150, 100, (v) { setState(() { _centerInset = v; }); _updatePreview(); }),
         _settingSlider('Stroke Width', _strokeWidth, 0, 10, 100, (v) { setState(() { _strokeWidth = v; _strokeWidthController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
         _settingSlider('Center Marker', _centerMarkerSize, 100, 250, 150, (v) { setState(() { _centerMarkerSize = v; _centerMarkerSizeController.text = v.toStringAsFixed(0); }); _updatePreview(); }),
         const SizedBox(height: 8),

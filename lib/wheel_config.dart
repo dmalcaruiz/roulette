@@ -14,6 +14,8 @@ class WheelConfig {
   final double strokeWidth;
   final bool showBackgroundCircle;
   final double centerMarkerSize;
+  final String innerCornerStyle; // 'none', 'rounded', 'circular', 'straight'
+  final double centerInset;
 
   WheelConfig({
     required this.id,
@@ -27,6 +29,8 @@ class WheelConfig {
     this.strokeWidth = 3.0,
     this.showBackgroundCircle = true,
     this.centerMarkerSize = 200.0,
+    this.innerCornerStyle = 'none',
+    this.centerInset = 50.0,
   });
 
   Map<String, dynamic> toJson() {
@@ -48,6 +52,8 @@ class WheelConfig {
       'strokeWidth': strokeWidth,
       'showBackgroundCircle': showBackgroundCircle,
       'centerMarkerSize': centerMarkerSize,
+      'innerCornerStyle': innerCornerStyle,
+      'centerInset': centerInset,
     };
   }
 
@@ -70,6 +76,8 @@ class WheelConfig {
       strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 3.0,
       showBackgroundCircle: (json['showBackgroundCircle'] as bool?) ?? true,
       centerMarkerSize: (json['centerMarkerSize'] as num?)?.toDouble() ?? 200.0,
+      innerCornerStyle: (json['innerCornerStyle'] as String?) ?? 'none',
+      centerInset: (json['centerInset'] as num?)?.toDouble() ?? 50.0,
     );
   }
 
@@ -91,6 +99,8 @@ class WheelConfig {
     double? strokeWidth,
     bool? showBackgroundCircle,
     double? centerMarkerSize,
+    String? innerCornerStyle,
+    double? centerInset,
   }) {
     return WheelConfig(
       id: id ?? this.id,
@@ -104,6 +114,8 @@ class WheelConfig {
       strokeWidth: strokeWidth ?? this.strokeWidth,
       showBackgroundCircle: showBackgroundCircle ?? this.showBackgroundCircle,
       centerMarkerSize: centerMarkerSize ?? this.centerMarkerSize,
+      innerCornerStyle: innerCornerStyle ?? this.innerCornerStyle,
+      centerInset: centerInset ?? this.centerInset,
     );
   }
 }

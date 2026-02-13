@@ -17,6 +17,8 @@ class SpinningWheel extends StatefulWidget {
   final double headerTextSizeMultiplier; // For header text
   final double imageSize; // For segment images
   final double cornerRadius;
+  final String innerCornerStyle;
+  final double centerInset;
   final double strokeWidth;
   final bool showBackgroundCircle;
   final double centerMarkerSize;
@@ -37,6 +39,8 @@ class SpinningWheel extends StatefulWidget {
     this.headerTextSizeMultiplier = 1.0,
     this.imageSize = 60.0,
     this.cornerRadius = 8.0,
+    this.innerCornerStyle = 'none',
+    this.centerInset = 50.0,
     this.strokeWidth = 3.0,
     this.showBackgroundCircle = true,
     this.centerMarkerSize = 200.0,
@@ -206,6 +210,8 @@ class SpinningWheelState extends State<SpinningWheel>
       imageCache: _imageCache,
       overlayColor: widget.overlayColor,
       textVerticalOffset: widget.size / 700 * 2,
+      innerCornerStyle: widget.innerCornerStyle,
+      centerInset: widget.centerInset,
       repaint: _repaintNotifier,
     );
   }
@@ -304,7 +310,9 @@ class SpinningWheelState extends State<SpinningWheel>
         oldWidget.strokeWidth != widget.strokeWidth ||
         oldWidget.showBackgroundCircle != widget.showBackgroundCircle ||
         oldWidget.imageSize != widget.imageSize ||
-        oldWidget.overlayColor != widget.overlayColor;
+        oldWidget.overlayColor != widget.overlayColor ||
+        oldWidget.innerCornerStyle != widget.innerCornerStyle ||
+        oldWidget.centerInset != widget.centerInset;
 
     if (oldWidget.items.length == widget.items.length) {
       for (int i = 0; i < widget.items.length; i++) {

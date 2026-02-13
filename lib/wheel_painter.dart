@@ -15,6 +15,8 @@ class WheelPainter extends CustomPainter {
   final Map<String, ui.Image> imageCache; // shared mutable reference
   final Color overlayColor;
   final double textVerticalOffset;
+  final String innerCornerStyle; // 'none', 'rounded', 'circular', 'straight'
+  final double centerInset;
 
   // Mutable fields updated by animation listeners between paints
   double rotation;
@@ -41,11 +43,12 @@ class WheelPainter extends CustomPainter {
     this.overlayColor = Colors.black,
     this.textVerticalOffset = 0.0,
     this.loadingAngle = 0.0,
+    this.innerCornerStyle = 'none',
+    this.centerInset = 50.0,
     super.repaint,
   });
 
   // ── Cached layout data (rebuilt lazily when size changes) ──
-  static const double _centerInset = 50.0;
   List<Path>? _pathCache;
   List<TextPainter>? _textCache;
   List<TextPainter?>? _iconCache;
@@ -148,13 +151,17 @@ class WheelPainter extends CustomPainter {
     final outerStartY = center.dy + radius * sin(startAngle);
     final outerEndX = center.dx + radius * cos(endAngle);
     final outerEndY = center.dy + radius * sin(endAngle);
-    final innerStartX = center.dx + _centerInset * cos(startAngle);
-    final innerStartY = center.dy + _centerInset * sin(startAngle);
-    final innerEndX = center.dx + _centerInset * cos(endAngle);
-    final innerEndY = center.dy + _centerInset * sin(endAngle);
 
     final path = Path();
-    path.moveTo(innerStartX, innerStartY);
+
+    if (innerCornerStyle == 'none') {
+      // Pie slice — goes to center
+      path.moveTo(center.dx, center.dy);
+    } else {
+      final innerStartX = center.dx + centerInset * cos(startAngle);
+      final innerStartY = center.dy + centerInset * sin(startAngle);
+      path.moveTo(innerStartX, innerStartY);
+    }
 
     path.lineTo(
       center.dx + (radius - cornerRadius) * cos(startAngle),
@@ -180,14 +187,34 @@ class WheelPainter extends CustomPainter {
       center.dy + (radius - cornerRadius) * sin(endAngle),
     );
 
-    path.lineTo(innerEndX, innerEndY);
+    if (innerCornerStyle == 'none') {
+      // Pie slice — back to center
+      path.lineTo(center.dx, center.dy);
+    } else {
+      final innerStartX = center.dx + centerInset * cos(startAngle);
+      final innerStartY = center.dy + centerInset * sin(startAngle);
+      final innerEndX = center.dx + centerInset * cos(endAngle);
+      final innerEndY = center.dy + centerInset * sin(endAngle);
 
-    path.arcTo(
-      Rect.fromCircle(center: center, radius: _centerInset),
-      endAngle,
-      -(segmentSize),
-      false,
-    );
+      path.lineTo(innerEndX, innerEndY);
+
+      if (innerCornerStyle == 'rounded') {
+        path.quadraticBezierTo(
+          center.dx, center.dy,
+          innerStartX, innerStartY,
+        );
+      } else if (innerCornerStyle == 'straight') {
+        path.lineTo(innerStartX, innerStartY);
+      } else {
+        // 'circular' — arc along inner circle
+        path.arcTo(
+          Rect.fromCircle(center: center, radius: centerInset),
+          endAngle,
+          -segmentSize,
+          false,
+        );
+      }
+    }
 
     path.close();
     return path;
@@ -238,7 +265,7 @@ class WheelPainter extends CustomPainter {
       canvas.save();
       canvas.translate(center.dx, center.dy);
       canvas.rotate(_startAngles![i] + _segmentSizes![i] / 2);
-      canvas.clipRect(Rect.fromLTRB(_centerInset, -radius, radius, radius));
+      canvas.clipRect(Rect.fromLTRB(centerInset, -radius, radius, radius));
 
       // Icon (cached)
       if (_iconCache![i] != null) {
@@ -288,7 +315,7 @@ class WheelPainter extends CustomPainter {
       canvas.save();
       canvas.translate(center.dx, center.dy);
       canvas.rotate(_startAngles![winningIndex] + _segmentSizes![winningIndex] / 2);
-      canvas.clipRect(Rect.fromLTRB(_centerInset, -radius, radius, radius));
+      canvas.clipRect(Rect.fromLTRB(centerInset, -radius, radius, radius));
 
       // Icon (cached)
       if (_iconCache![winningIndex] != null) {
