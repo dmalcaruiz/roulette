@@ -618,7 +618,9 @@ class _WheelEditorState extends State<WheelEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
+      child: SingleChildScrollView(
       controller: widget.scrollController,
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 16),
@@ -1077,6 +1079,7 @@ class _WheelEditorState extends State<WheelEditor> {
           ],
         ],
       ),
+    ),
     );
   }
 

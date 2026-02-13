@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' show min, pi;
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
@@ -41,6 +42,16 @@ void main() {
   runApp(const MyApp());
 }
 
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -67,6 +78,7 @@ class MyApp extends StatelessWidget {
     );
 
     return MaterialApp(
+      scrollBehavior: _AppScrollBehavior(),
       debugShowCheckedModeBanner: false,
       title: 'Flutter Spinning Wheel',
       theme: ThemeData(
