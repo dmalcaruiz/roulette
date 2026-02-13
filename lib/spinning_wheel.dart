@@ -76,6 +76,8 @@ class SpinningWheelState extends State<SpinningWheel>
   late final Listenable _repaintNotifier;
   final ValueNotifier<int> _repaintVersion = ValueNotifier<int>(0);
   late WheelPainter _wheelPainter;
+  late AnimationController _transitionController;
+  List<WheelItem>? _fromItems;
 
   @override
   void initState() {
@@ -95,6 +97,23 @@ class SpinningWheelState extends State<SpinningWheel>
       duration: const Duration(milliseconds: 3000),
       vsync: this,
     );
+
+    _transitionController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    )..addListener(() {
+      _wheelPainter.transition = _transitionController.value;
+      _wheelPainter.invalidateCache();
+      _repaintVersion.value++;
+    })..addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _wheelPainter.fromItems = null;
+        _wheelPainter.transition = 1.0;
+        _fromItems = null;
+        _wheelPainter.invalidateCache();
+        _repaintVersion.value++;
+      }
+    });
 
     _overlayController = AnimationController(
       duration: const Duration(milliseconds: 400),
@@ -297,7 +316,16 @@ class SpinningWheelState extends State<SpinningWheel>
     }
 
     if (itemsChanged || configChanged) {
-      _wheelPainter = _createWheelPainter();
+      // Animate transition if same segment count and only items changed
+      if (itemsChanged && !configChanged && oldWidget.items.length == widget.items.length) {
+        _fromItems = oldWidget.items;
+        _wheelPainter = _createWheelPainter();
+        _wheelPainter.fromItems = _fromItems;
+        _wheelPainter.transition = 0.0;
+        _transitionController.forward(from: 0);
+      } else {
+        _wheelPainter = _createWheelPainter();
+      }
     }
 
     if (itemsChanged || imagePathsChanged) {
@@ -313,6 +341,7 @@ class SpinningWheelState extends State<SpinningWheel>
     _repaintVersion.dispose();
     _loadingController.dispose();
     _controller.dispose();
+    _transitionController.dispose();
     _overlayController.dispose();
     for (var player in _audioPool) {
       player.dispose();

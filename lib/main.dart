@@ -42,16 +42,6 @@ void main() {
   runApp(const MyApp());
 }
 
-class _AppScrollBehavior extends MaterialScrollBehavior {
-  @override
-  Set<PointerDeviceKind> get dragDevices => {
-    PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.trackpad,
-    PointerDeviceKind.stylus,
-  };
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -78,7 +68,6 @@ class MyApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      scrollBehavior: _AppScrollBehavior(),
       debugShowCheckedModeBanner: false,
       title: 'Flutter Spinning Wheel',
       theme: ThemeData(
@@ -206,6 +195,7 @@ class _WheelDemoState extends State<WheelDemo> {
   // Snapping sheet controls (mobile)
   final SnappingSheetController _snappingSheetController = SnappingSheetController();
   final ScrollController _sheetScrollController = ScrollController();
+  final ValueNotifier<bool> _isReordering = ValueNotifier(false);
   final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
   static const double _grabbingHeight = 30.0;
   static const double _bottomControlsHeight = 60.0;
@@ -850,6 +840,7 @@ class _WheelDemoState extends State<WheelDemo> {
       onPreview: _handleWheelPreview,
       onClose: showClose ? _closeSheet : null,
       scrollController: showClose ? _sheetScrollController : null,
+      isReordering: _isReordering,
     );
   }
 
@@ -1268,6 +1259,7 @@ class _WheelDemoState extends State<WheelDemo> {
                   child: _SheetScrollWrapper(
                     scrollController: _sheetScrollController,
                     snappingSheetController: _snappingSheetController,
+                    isReordering: _isReordering,
                     child: Container(
                       decoration: const BoxDecoration(
                         color: Colors.white,
@@ -1945,11 +1937,13 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
 class _SheetScrollWrapper extends StatefulWidget {
   final ScrollController scrollController;
   final SnappingSheetController snappingSheetController;
+  final ValueNotifier<bool> isReordering;
   final Widget child;
 
   const _SheetScrollWrapper({
     required this.scrollController,
     required this.snappingSheetController,
+    required this.isReordering,
     required this.child,
   });
 
@@ -1960,6 +1954,33 @@ class _SheetScrollWrapper extends StatefulWidget {
 class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
   bool _isDraggingSheet = false;
   double _dragStartSheetPos = 0;
+
+  void _snapToClosest() {
+    final current = widget.snappingSheetController.currentPosition;
+    final positions = <double>[-34, 460];
+    double bestDist = double.infinity;
+    double bestPos = 460;
+    final dragDelta = current - _dragStartSheetPos;
+    for (final pos in positions) {
+      final dist = (current - pos).abs();
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPos = pos;
+      }
+    }
+    if (dragDelta < -80 && bestPos > -34) {
+      bestPos = -34;
+    } else if (dragDelta > 80 && bestPos < 460) {
+      bestPos = 460;
+    }
+    widget.snappingSheetController.snapToPosition(
+      SnappingPosition.pixels(
+        positionPixels: bestPos,
+        snappingCurve: Curves.easeOutExpo,
+        snappingDuration: const Duration(milliseconds: 900),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1975,11 +1996,17 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
         final sheetPos = widget.snappingSheetController.currentPosition;
         final atBottomSnap = sheetPos <= 0;
 
-        if (_isDraggingSheet) {
+        if (_isDraggingSheet && widget.isReordering.value) {
+          // Reorder just started — cancel sheet drag and snap back
+          debugPrint('[SHEET] drag cancelled (reorder took over)');
+          _isDraggingSheet = false;
+          _snapToClosest();
+        } else if (_isDraggingSheet) {
           // Already in sheet-drag mode — keep driving the sheet
           widget.snappingSheetController.setSnappingSheetPosition(sheetPos - dy);
-        } else if (atTop && isDraggingDown) {
+        } else if (atTop && isDraggingDown && !widget.isReordering.value) {
           // At top of scroll and pulling down — enter sheet-drag mode
+          debugPrint('[SHEET] drag started (down from top)');
           _isDraggingSheet = true;
           _dragStartSheetPos = sheetPos;
           if (widget.snappingSheetController.currentlySnapping) {
@@ -1987,6 +2014,7 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           }
         } else if (atBottomSnap && isDraggingUp) {
           // At bottom snap and swiping up — enter sheet-drag mode
+          debugPrint('[SHEET] drag started (up from bottom)');
           _isDraggingSheet = true;
           _dragStartSheetPos = sheetPos;
           if (widget.snappingSheetController.currentlySnapping) {
@@ -1997,34 +2025,7 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
       onPointerUp: (_) {
         if (_isDraggingSheet) {
           _isDraggingSheet = false;
-          // Snap to the nearest position
-          final current = widget.snappingSheetController.currentPosition;
-          // Determine best snap: find closest among the known positions
-          final positions = <double>[-34, 460];
-          double bestDist = double.infinity;
-          double bestPos = 460;
-          // Also use velocity direction: if we dragged down significantly, bias downward
-          final dragDelta = current - _dragStartSheetPos;
-          for (final pos in positions) {
-            final dist = (current - pos).abs();
-            if (dist < bestDist) {
-              bestDist = dist;
-              bestPos = pos;
-            }
-          }
-          // If dragged significantly, bias in that direction
-          if (dragDelta < -80 && bestPos > -34) {
-            bestPos = -34;
-          } else if (dragDelta > 80 && bestPos < 460) {
-            bestPos = 460;
-          }
-          widget.snappingSheetController.snapToPosition(
-            SnappingPosition.pixels(
-              positionPixels: bestPos,
-              snappingCurve: Curves.easeOutExpo,
-              snappingDuration: const Duration(milliseconds: 900),
-            ),
-          );
+          _snapToClosest();
         }
       },
       child: widget.child,

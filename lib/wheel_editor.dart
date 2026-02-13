@@ -32,6 +32,7 @@ class WheelEditor extends StatefulWidget {
   final Function(WheelConfig)? onPreview;
   final VoidCallback? onClose;
   final ScrollController? scrollController;
+  final ValueNotifier<bool>? isReordering;
 
   const WheelEditor({
     super.key,
@@ -41,6 +42,7 @@ class WheelEditor extends StatefulWidget {
     this.onPreview,
     this.onClose,
     this.scrollController,
+    this.isReordering,
   });
 
   @override
@@ -618,9 +620,7 @@ class _WheelEditorState extends State<WheelEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
-      child: SingleChildScrollView(
+    return SingleChildScrollView(
       controller: widget.scrollController,
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 16),
@@ -675,6 +675,14 @@ class _WheelEditorState extends State<WheelEditor> {
                   child: child,
                 ),
               );
+            },
+            onReorderStart: (_) {
+              debugPrint('[REORDER] drag started');
+              widget.isReordering?.value = true;
+            },
+            onReorderEnd: (_) {
+              debugPrint('[REORDER] drag ended');
+              widget.isReordering?.value = false;
             },
             onReorder: (oldIndex, newIndex) {
               try {
@@ -1036,7 +1044,9 @@ class _WheelEditorState extends State<WheelEditor> {
                         top: 0,
                         bottom: 0,
                         width: 45,
-                        child: ReorderableDragStartListener(
+                        child: IgnorePointer(
+                          ignoring: isExpanded,
+                          child: ReorderableDragStartListener(
                           index: index,
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
@@ -1057,6 +1067,7 @@ class _WheelEditorState extends State<WheelEditor> {
                             child: const SizedBox.expand(),
                           ),
                         ),
+                      ),
                       ),
                     ],
                   ),
@@ -1079,7 +1090,6 @@ class _WheelEditorState extends State<WheelEditor> {
           ],
         ],
       ),
-    ),
     );
   }
 

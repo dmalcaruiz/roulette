@@ -22,6 +22,11 @@ class WheelPainter extends CustomPainter {
   int winningIndex;
   double loadingAngle;
 
+  // Segment transition support
+  List<WheelItem>? fromItems;
+  double transition = 1.0;
+  int _cacheVersion = 0;
+
   WheelPainter({
     required this.items,
     required this.rotation,
@@ -54,13 +59,31 @@ class WheelPainter extends CustomPainter {
     ..style = PaintingStyle.stroke
     ..color = Colors.white;
 
+  int _lastCacheVersion = -1;
+
+  void invalidateCache() {
+    _cacheVersion++;
+  }
+
   void _ensureCache(Size size) {
-    if (_lastSize == size && _pathCache != null) return;
+    if (_lastSize == size && _pathCache != null && _lastCacheVersion == _cacheVersion) return;
     _lastSize = size;
+    _lastCacheVersion = _cacheVersion;
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = min(size.width, size.height) / 2;
-    final totalWeight = items.fold<double>(0.0, (sum, item) => sum + item.weight);
+
+    // Use interpolated weights when transitioning
+    final effectiveWeights = <double>[];
+    for (int i = 0; i < items.length; i++) {
+      if (fromItems != null && i < fromItems!.length && transition < 1.0) {
+        effectiveWeights.add(fromItems![i].weight + (items[i].weight - fromItems![i].weight) * transition);
+      } else {
+        effectiveWeights.add(items[i].weight);
+      }
+    }
+
+    final totalWeight = effectiveWeights.fold<double>(0.0, (sum, w) => sum + w);
     final arcSize = (2 * pi) / totalWeight;
 
     _pathCache = [];
@@ -72,7 +95,7 @@ class WheelPainter extends CustomPainter {
     double startAngle = 0;
     for (int i = 0; i < items.length; i++) {
       final item = items[i];
-      final segmentSize = arcSize * item.weight;
+      final segmentSize = arcSize * effectiveWeights[i];
       final endAngle = startAngle + segmentSize;
 
       _startAngles!.add(startAngle);
@@ -159,9 +182,11 @@ class WheelPainter extends CustomPainter {
 
     path.lineTo(innerEndX, innerEndY);
 
-    path.quadraticBezierTo(
-      center.dx, center.dy,
-      innerStartX, innerStartY,
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: _centerInset),
+      endAngle,
+      -(segmentSize),
+      false,
     );
 
     path.close();
@@ -196,8 +221,11 @@ class WheelPainter extends CustomPainter {
       final item = items[i];
       final path = _pathCache![i];
 
-      // Segment fill
-      _fillPaint.color = item.color;
+      // Segment fill — lerp color during transition
+      final effectiveColor = (fromItems != null && i < fromItems!.length && transition < 1.0)
+          ? Color.lerp(fromItems![i].color, item.color, transition)!
+          : item.color;
+      _fillPaint.color = effectiveColor;
       canvas.drawPath(path, _fillPaint);
 
       // Segment stroke
