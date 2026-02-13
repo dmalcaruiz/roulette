@@ -20,9 +20,6 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
 
-  <!-- Viewport for mobile responsiveness and proper touch handling -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -34,31 +31,6 @@
 
   <title>wheel</title>
   <link rel="manifest" href="manifest.json">
-
-  <style>
-    /* Prevent default touch behaviors that interfere with pan gestures */
-    body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      /* Disable pull-to-refresh and overscroll effects on iOS */
-      overscroll-behavior: none;
-      /* Prevent text selection during drag */
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-      /* Allow custom touch handling */
-      touch-action: none;
-      /* Prevent iOS Safari from highlighting touched elements */
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    /* Ensure the Flutter app container also has proper touch handling */
-    flt-glass-pane {
-      touch-action: none !important;
-    }
-  </style>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
