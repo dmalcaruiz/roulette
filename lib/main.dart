@@ -1382,37 +1382,19 @@ class _WheelDemoState extends State<WheelDemo> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Settings button (left)
-                          Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(50),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(50),
-                              onTap: _openGearMenu,
-                              child: Container(
-                                width: 46,
-                                height: 46,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(50),
-                                ),
-                                child: const Icon(LucideIcons.settings, color: Colors.black, size: 22),
-                              ),
+                          GestureDetector(
+                            onTap: _openGearMenu,
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(LucideIcons.settings, color: Colors.white, size: 32),
                             ),
                           ),
                           // Wheels button (right)
-                          Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(50),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(50),
-                              onTap: _openWheelsScreen,
-                              child: Container(
-                                width: 46,
-                                height: 46,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(50),
-                                ),
-                                child: const Icon(LucideIcons.list, color: Colors.black, size: 22),
-                              ),
+                          GestureDetector(
+                            onTap: _openWheelsScreen,
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(LucideIcons.list, color: Colors.white, size: 32),
                             ),
                           ),
                         ],
@@ -2112,6 +2094,7 @@ class _WheelThumbnailPainter extends CustomPainter {
         ..color = Colors.black.withValues(alpha: 0.15)
         ..strokeWidth = 1.5,
     );
+    /*
     // Outer stroke
     canvas.drawCircle(
       center,
@@ -2121,6 +2104,7 @@ class _WheelThumbnailPainter extends CustomPainter {
         ..color = Colors.black.withValues(alpha: 0.15)
         ..strokeWidth = 1.5,
     );
+    */
   }
 
   @override
