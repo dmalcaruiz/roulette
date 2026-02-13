@@ -68,6 +68,7 @@ class SpinningWheelState extends State<SpinningWheel>
   bool _isPullingBack = false;
   double _currentRotation = 0;
   final ValueNotifier<String> _currentSegmentNotifier = ValueNotifier('');
+  final ValueNotifier<double> _segmentHeaderOpacity = ValueNotifier(1.0);
   final List<Timer> _scheduledSounds = [];
   final Map<String, ui.Image> _imageCache = {};
   Timer? _imageRetryTimer;
@@ -308,6 +309,7 @@ class SpinningWheelState extends State<SpinningWheel>
   void dispose() {
     _imageRetryTimer?.cancel();
     _currentSegmentNotifier.dispose();
+    _segmentHeaderOpacity.dispose();
     _repaintVersion.dispose();
     _loadingController.dispose();
     _controller.dispose();
@@ -458,9 +460,11 @@ class SpinningWheelState extends State<SpinningWheel>
     final numRotations = (currentRotation / fullRotation).round();
     final closestRotation = numRotations * fullRotation;
 
+    // Fade out the header text
+    _segmentHeaderOpacity.value = 0.0;
+
     // If we're already at the closest point, just update the display
     if ((currentRotation - closestRotation).abs() < 0.01) {
-      _currentSegmentNotifier.value = '';
       setState(() {
         _isResetting = false;
       });
@@ -482,6 +486,8 @@ class SpinningWheelState extends State<SpinningWheel>
 
   void spin() {
     if (_isSpinning) return;
+
+    _segmentHeaderOpacity.value = 1.0;
 
     setState(() {
       _isSpinning = true;
@@ -624,18 +630,28 @@ class SpinningWheelState extends State<SpinningWheel>
             height: (56 * widget.headerTextSizeMultiplier + 16) * widget.headerSizeProgress,
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: ValueListenableBuilder<String>(
-                valueListenable: _currentSegmentNotifier,
-                builder: (context, segment, _) {
-                  return Text(
-                    segment,
-                    style: TextStyle(
-                      fontSize: 56 * widget.headerTextSizeMultiplier,
-                      fontWeight: FontWeight.w700,
-                      color: widget.headerTextColor,
-                    ),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _segmentHeaderOpacity,
+                builder: (context, textOpacity, child) {
+                  return AnimatedOpacity(
+                    opacity: textOpacity,
+                    duration: const Duration(milliseconds: 300),
+                    child: child!,
                   );
                 },
+                child: ValueListenableBuilder<String>(
+                  valueListenable: _currentSegmentNotifier,
+                  builder: (context, segment, _) {
+                    return Text(
+                      segment,
+                      style: TextStyle(
+                        fontSize: 56 * widget.headerTextSizeMultiplier,
+                        fontWeight: FontWeight.w700,
+                        color: widget.headerTextColor,
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
