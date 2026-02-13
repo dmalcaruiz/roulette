@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' if (dart.library.html) 'dart:html';
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
