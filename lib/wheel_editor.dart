@@ -31,6 +31,7 @@ class WheelEditor extends StatefulWidget {
   final VoidCallback? onCancel;
   final Function(WheelConfig)? onPreview;
   final VoidCallback? onClose;
+  final ScrollController? scrollController;
 
   const WheelEditor({
     super.key,
@@ -39,6 +40,7 @@ class WheelEditor extends StatefulWidget {
     this.onCancel,
     this.onPreview,
     this.onClose,
+    this.scrollController,
   });
 
   @override
@@ -521,6 +523,7 @@ class _WheelEditorState extends State<WheelEditor> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      controller: widget.scrollController,
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 16),
       child: Column(

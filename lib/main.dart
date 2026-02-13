@@ -193,6 +193,7 @@ class _WheelDemoState extends State<WheelDemo> {
 
   // Snapping sheet controls (mobile)
   final SnappingSheetController _snappingSheetController = SnappingSheetController();
+  final ScrollController _sheetScrollController = ScrollController();
   final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
   static const double _grabbingHeight = 30.0;
   static const double _bottomControlsHeight = 60.0;
@@ -836,6 +837,7 @@ class _WheelDemoState extends State<WheelDemo> {
       initialConfig: wheelToEdit,
       onPreview: _handleWheelPreview,
       onClose: showClose ? _closeSheet : null,
+      scrollController: showClose ? _sheetScrollController : null,
     );
   }
 
@@ -1251,6 +1253,7 @@ class _WheelDemoState extends State<WheelDemo> {
                 grabbing: _buildGrabbingHandle(),
                 sheetBelow: SnappingSheetContent(
                   draggable: true,
+                  childScrollController: _sheetScrollController,
                   child: Container(
                     decoration: const BoxDecoration(
                       color: Colors.white,
