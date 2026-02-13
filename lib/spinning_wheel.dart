@@ -77,7 +77,10 @@ class SpinningWheelState extends State<SpinningWheel>
   @override
   void initState() {
     super.initState();
-    _initializeAudioPool();
+    // Defer audio init so it doesn't block early frames / first render
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAudioPool();
+    });
 
     _loadingController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -155,14 +158,18 @@ class SpinningWheelState extends State<SpinningWheel>
 
   Future<void> _initializeAudioPool() async {
     try {
-      for (int i = 0; i < _poolSize; i++) {
-        final player = AudioPlayer();
-        if (!kIsWeb) {
-          await player.setPlayerMode(PlayerMode.lowLatency);
-        }
-        await player.setSource(AssetSource('audio/click.mp3'));
-        _audioPool.add(player);
-      }
+      // Initialize all players in parallel instead of sequentially
+      final players = await Future.wait(
+        List.generate(_poolSize, (_) async {
+          final player = AudioPlayer();
+          if (!kIsWeb) {
+            await player.setPlayerMode(PlayerMode.lowLatency);
+          }
+          await player.setSource(AssetSource('audio/click.mp3'));
+          return player;
+        }),
+      );
+      _audioPool.addAll(players);
     } catch (e) {
       // Ignore audio initialization errors
     }
