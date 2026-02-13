@@ -4,7 +4,6 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'wheel_item.dart';
@@ -75,13 +74,6 @@ class SpinningWheelState extends State<SpinningWheel>
   final ValueNotifier<int> _repaintVersion = ValueNotifier<int>(0);
   late WheelPainter _wheelPainter;
 
-  // Physics-based manual spin state
-  bool _isManuallySpinning = false;
-  double _lastPanAngle = 0;
-  double _angularVelocity = 0;
-  late AnimationController _physicsController;
-  String? _lastManualSegment;
-
   @override
   void initState() {
     super.initState();
@@ -106,10 +98,6 @@ class SpinningWheelState extends State<SpinningWheel>
       vsync: this,
     );
 
-    _physicsController = AnimationController.unbounded(
-      vsync: this,
-    );
-
     _overlayAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -120,7 +108,7 @@ class SpinningWheelState extends State<SpinningWheel>
 
     // 2. Merge all animation sources into one repaint notifier
     _repaintNotifier = Listenable.merge([
-      _controller, _overlayController, _loadingController, _physicsController, _repaintVersion,
+      _controller, _overlayController, _loadingController, _repaintVersion,
     ]);
 
     // 3. Create persistent wheel painter (uses repaint notifier for animation)
@@ -143,15 +131,6 @@ class SpinningWheelState extends State<SpinningWheel>
 
     _overlayController.addListener(() {
       _wheelPainter.overlayOpacity = _overlayAnimation.value;
-    });
-
-    _physicsController.addListener(() {
-      _currentRotation = _physicsController.value;
-      _wheelPainter.rotation = _currentRotation;
-      _updateCurrentSegment();
-      if (_isManuallySpinning || _physicsController.isAnimating) {
-        _checkManualSegmentChange();
-      }
     });
 
     _controller.addStatusListener((status) {
@@ -328,7 +307,6 @@ class SpinningWheelState extends State<SpinningWheel>
     _loadingController.dispose();
     _controller.dispose();
     _overlayController.dispose();
-    _physicsController.dispose();
     for (var player in _audioPool) {
       player.dispose();
     }
@@ -363,14 +341,6 @@ class SpinningWheelState extends State<SpinningWheel>
         break;
       }
     }
-  }
-
-  void _checkManualSegmentChange() {
-    final currentSegment = _currentSegmentNotifier.value;
-    if (_lastManualSegment != null && currentSegment != _lastManualSegment) {
-      _playClickSoundFromPool();
-    }
-    _lastManualSegment = currentSegment;
   }
 
   int _getRandomWeightedIndex() {
@@ -460,11 +430,9 @@ class SpinningWheelState extends State<SpinningWheel>
     }
     _scheduledSounds.clear();
 
-    // Stop current animation and physics
+    // Stop current animation
     _controller.stop();
     _overlayController.stop();
-    _physicsController.stop();
-    _isManuallySpinning = false;
 
     // Get current rotation for smooth animation
     final currentRotation = _currentRotation;
@@ -507,83 +475,8 @@ class SpinningWheelState extends State<SpinningWheel>
     _controller.forward(from: 0);
   }
 
-  void _onPanStart(DragStartDetails details) {
-    // Don't allow manual spin during programmatic spin
-    if (_isSpinning || _isResetting) return;
-
-    // Stop any ongoing physics animation
-    _physicsController.stop();
-
-    _isManuallySpinning = true;
-    final center = Offset(widget.size / 2, widget.size / 2);
-    final touchPoint = details.localPosition - center;
-    _lastPanAngle = atan2(touchPoint.dy, touchPoint.dx);
-    _lastManualSegment = _currentSegmentNotifier.value;
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (!_isManuallySpinning) return;
-
-    final center = Offset(widget.size / 2, widget.size / 2);
-    final touchPoint = details.localPosition - center;
-    final currentAngle = atan2(touchPoint.dy, touchPoint.dx);
-
-    // Calculate angular change
-    double deltaAngle = currentAngle - _lastPanAngle;
-
-    // Handle wraparound (when angle crosses -π/π boundary)
-    if (deltaAngle > pi) {
-      deltaAngle -= 2 * pi;
-    } else if (deltaAngle < -pi) {
-      deltaAngle += 2 * pi;
-    }
-
-    // Update rotation in real-time
-    _currentRotation += deltaAngle; // Add to make drag direction match wheel rotation
-    _wheelPainter.rotation = _currentRotation;
-    _updateCurrentSegment();
-    _checkManualSegmentChange();
-
-    // Calculate angular velocity for momentum (radians per millisecond)
-    final dt = details.delta.distance > 0 ? 16.0 : 1.0; // Approximate frame time
-    _angularVelocity = deltaAngle / dt;
-
-    _lastPanAngle = currentAngle;
-    _repaintVersion.value++;
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    if (!_isManuallySpinning) return;
-
-    _isManuallySpinning = false;
-
-    // Apply momentum using physics simulation
-    // Convert velocity to a reasonable scale
-    var velocity = _angularVelocity * 1000; // Convert to radians per second
-
-    // Clamp velocity to prevent lag from spinning too fast (max ~3 rotations per second)
-    const maxVelocity = 18.0; // ~3 * 2π radians per second
-    velocity = velocity.clamp(-maxVelocity, maxVelocity);
-
-    // Only apply momentum if there's significant velocity
-    if (velocity.abs() > 0.1) {
-      // Use friction simulation for natural deceleration
-      final simulation = FrictionSimulation(
-        0.05, // Drag coefficient (lower = less friction, spins longer)
-        _currentRotation,
-        velocity,
-      );
-
-      // Set controller to current value before starting simulation
-      _physicsController.value = _currentRotation;
-      _physicsController.animateWith(simulation);
-    }
-
-    _lastManualSegment = null;
-  }
-
   void spin() {
-    if (_isSpinning || _isManuallySpinning) return;
+    if (_isSpinning) return;
 
     setState(() {
       _isSpinning = true;
@@ -749,9 +642,6 @@ class SpinningWheelState extends State<SpinningWheel>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: spin,
-                onPanStart: _onPanStart,
-                onPanUpdate: _onPanUpdate,
-                onPanEnd: _onPanEnd,
                 child: CustomPaint(
                   painter: _wheelPainter,
                 ),
