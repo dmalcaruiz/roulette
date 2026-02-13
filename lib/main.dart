@@ -1965,8 +1965,8 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
 
   void _snapToClosest() {
     final current = widget.snappingSheetController.currentPosition;
-    final upperSnap = widget.upperSnapHeight;
-    final positions = <double>[-34, 460, upperSnap];
+    // Content drag only snaps between bottom (-34) and mid (460) — upper snap is handle-only
+    final positions = <double>[-34, 460];
     double bestDist = double.infinity;
     double bestPos = 460;
     final dragDelta = current - _dragStartSheetPos;
@@ -1978,14 +1978,10 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
       }
     }
     // Bias toward the direction of the drag
-    if (dragDelta < -80) {
-      // Dragging down — find the nearest position below current
-      final below = positions.where((p) => p < _dragStartSheetPos).toList()..sort();
-      if (below.isNotEmpty) bestPos = below.last;
-    } else if (dragDelta > 80) {
-      // Dragging up — find the nearest position above current
-      final above = positions.where((p) => p > _dragStartSheetPos).toList()..sort();
-      if (above.isNotEmpty) bestPos = above.first;
+    if (dragDelta < -80 && bestPos > -34) {
+      bestPos = -34;
+    } else if (dragDelta > 80 && bestPos < 460) {
+      bestPos = 460;
     }
     widget.snappingSheetController.snapToPosition(
       SnappingPosition.pixels(
@@ -2026,8 +2022,9 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           // Horizontal swipe started before sheet drag — lock out sheet drag
           _isSwiping = true;
         } else if (_isDraggingSheet) {
-          // Already in sheet-drag mode — keep driving the sheet
-          widget.snappingSheetController.setSnappingSheetPosition(sheetPos - dy);
+          // Already in sheet-drag mode — keep driving the sheet (clamped to midsnap max)
+          final newPos = (sheetPos - dy).clamp(-34.0, 460.0);
+          widget.snappingSheetController.setSnappingSheetPosition(newPos);
         } else if (atTop && isDraggingDown && !widget.isReordering.value) {
           // At top of scroll and pulling down — enter sheet-drag mode
           _isDraggingSheet = true;

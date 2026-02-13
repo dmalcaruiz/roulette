@@ -64,6 +64,13 @@ class _WheelEditorState extends State<WheelEditor> {
   late double _centerInset;
   int? _expandedSegmentIndex;
   int _selectedTabIndex = 0;
+
+  bool get _shouldAutofocus {
+    if (foundation.kIsWeb) return false;
+    final platform = foundation.defaultTargetPlatform;
+    return platform != foundation.TargetPlatform.android &&
+           platform != foundation.TargetPlatform.iOS;
+  }
   Timer? _keyRepeatTimer;
   Timer? _previewDebounceTimer;
   final Map<String, TextEditingController> _weightControllers = {};
@@ -556,6 +563,7 @@ class _WheelEditorState extends State<WheelEditor> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOut,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: isActive ? activeColor : Colors.transparent,
                   borderRadius: BorderRadius.circular(borderRadius - 2),
@@ -707,18 +715,16 @@ class _WheelEditorState extends State<WheelEditor> {
             _buildStyleTab()
           else ...[
             const SizedBox(height: 14),
-            ReorderableListView.builder(
+            ClipRect(
+            child: ReorderableListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
             itemCount: _segments.length,
             proxyDecorator: (child, index, animation) {
-              return Transform.scale(
-                scale: 1.05,
-                child: Material(
-                  color: Colors.transparent,
-                  child: child,
-                ),
+              return Material(
+                color: Colors.transparent,
+                child: child,
               );
             },
             onReorderStart: (_) {
@@ -749,7 +755,7 @@ class _WheelEditorState extends State<WheelEditor> {
                         _expandedSegmentIndex = null;
                       } else {
                         _expandedSegmentIndex = index;
-                        if (!foundation.kIsWeb) {
+                        if (_shouldAutofocus) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _segmentFocusNodes[segment.id]?.requestFocus();
                           });
@@ -1101,7 +1107,7 @@ class _WheelEditorState extends State<WheelEditor> {
                                   _expandedSegmentIndex = null;
                                 } else {
                                   _expandedSegmentIndex = index;
-                                  if (!foundation.kIsWeb) {
+                                  if (_shouldAutofocus) {
                                     WidgetsBinding.instance.addPostFrameCallback((_) {
                                       _segmentFocusNodes[segment.id]?.requestFocus();
                                     });
@@ -1122,6 +1128,7 @@ class _WheelEditorState extends State<WheelEditor> {
                 return Container(key: ValueKey('error_${_segments[index].id}'));
               }
             },
+          ),
           ),
           const SizedBox(height: 10),
           _editorPillButton(
