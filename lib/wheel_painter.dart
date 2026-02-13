@@ -5,19 +5,22 @@ import 'wheel_item.dart';
 import 'icon_map.dart';
 
 class WheelPainter extends CustomPainter {
+  // Immutable config (new painter created when these change)
   final List<WheelItem> items;
-  final double rotation;
   final TextStyle textStyle;
   final double cornerRadius;
   final double strokeWidth;
   final bool showBackgroundCircle;
   final double imageSize;
-  final Map<String, ui.Image> imageCache;
-  final double overlayOpacity;
-  final int winningIndex;
+  final Map<String, ui.Image> imageCache; // shared mutable reference
   final Color overlayColor;
   final double textVerticalOffset;
-  final double loadingAngle;
+
+  // Mutable fields updated by animation listeners between paints
+  double rotation;
+  double overlayOpacity;
+  int winningIndex;
+  double loadingAngle;
 
   WheelPainter({
     required this.items,
@@ -33,145 +36,64 @@ class WheelPainter extends CustomPainter {
     this.overlayColor = Colors.black,
     this.textVerticalOffset = 0.0,
     this.loadingAngle = 0.0,
+    super.repaint,
   });
 
-  @override
-  void paint(Canvas canvas, Size size) {
+  // ── Cached layout data (rebuilt lazily when size changes) ──
+  static const double _centerInset = 50.0;
+  List<Path>? _pathCache;
+  List<TextPainter>? _textCache;
+  List<TextPainter?>? _iconCache;
+  List<double>? _startAngles;
+  List<double>? _segmentSizes;
+  Size? _lastSize;
+
+  // Reusable paint objects to avoid per-frame allocation
+  final Paint _fillPaint = Paint()..style = PaintingStyle.fill;
+  final Paint _strokePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..color = Colors.white;
+
+  void _ensureCache(Size size) {
+    if (_lastSize == size && _pathCache != null) return;
+    _lastSize = size;
+
     final center = Offset(size.width / 2, size.height / 2);
     final radius = min(size.width, size.height) / 2;
-    final scale = radius / 350.0; // Scale factor relative to base 700px wheel
-
-    // Draw background circle if enabled
-    if (showBackgroundCircle) {
-      canvas.drawCircle(
-        center,
-        radius,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.fill,
-      );
-
-      // Draw stroke around background circle if strokeWidth > 0
-      if (strokeWidth > 0) {
-        canvas.drawCircle(
-          center,
-          radius,
-          Paint()
-            ..color = Colors.white
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = strokeWidth,
-        );
-      }
-    }
-
     final totalWeight = items.fold<double>(0.0, (sum, item) => sum + item.weight);
     final arcSize = (2 * pi) / totalWeight;
 
-    double startAngle = rotation;
+    _pathCache = [];
+    _textCache = [];
+    _iconCache = [];
+    _startAngles = [];
+    _segmentSizes = [];
 
+    double startAngle = 0;
     for (int i = 0; i < items.length; i++) {
       final item = items[i];
       final segmentSize = arcSize * item.weight;
       final endAngle = startAngle + segmentSize;
 
-      // Draw the segment with rounded corners
-      final paint = Paint()
-        ..color = item.color
-        ..style = PaintingStyle.fill;
+      _startAngles!.add(startAngle);
+      _segmentSizes!.add(segmentSize);
+      _pathCache!.add(_buildSegmentPath(center, radius, startAngle, endAngle));
 
-      final centerInset = 50.0; // How far from center the rounded corner starts
-
-      // Calculate key points
-      final outerStartX = center.dx + radius * cos(startAngle);
-      final outerStartY = center.dy + radius * sin(startAngle);
-      final outerEndX = center.dx + radius * cos(endAngle);
-      final outerEndY = center.dy + radius * sin(endAngle);
-
-      final innerStartX = center.dx + centerInset * cos(startAngle);
-      final innerStartY = center.dy + centerInset * sin(startAngle);
-      final innerEndX = center.dx + centerInset * cos(endAngle);
-      final innerEndY = center.dy + centerInset * sin(endAngle);
-
-      final path = Path();
-
-      // Start at inner point on start angle
-      path.moveTo(innerStartX, innerStartY);
-
-      // Line to outer edge (leaving room for corner)
-      final outerStartInsetX = center.dx + (radius - cornerRadius) * cos(startAngle);
-      final outerStartInsetY = center.dy + (radius - cornerRadius) * sin(startAngle);
-      path.lineTo(outerStartInsetX, outerStartInsetY);
-
-      // Rounded corner to arc
-      path.quadraticBezierTo(
-        outerStartX,
-        outerStartY,
-        center.dx + radius * cos(startAngle + cornerRadius / radius),
-        center.dy + radius * sin(startAngle + cornerRadius / radius),
+      // Cache laid-out text painter
+      final tp = TextPainter(
+        text: TextSpan(text: item.text, style: textStyle),
+        textAlign: TextAlign.right,
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
       );
+      tp.layout();
+      _textCache!.add(tp);
 
-      // Main outer arc
-      path.arcTo(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle + cornerRadius / radius,
-        segmentSize - (2 * cornerRadius / radius),
-        false,
-      );
-
-      // Rounded corner from arc
-      path.quadraticBezierTo(
-        outerEndX,
-        outerEndY,
-        center.dx + (radius - cornerRadius) * cos(endAngle),
-        center.dy + (radius - cornerRadius) * sin(endAngle),
-      );
-
-      // Line back toward center
-      path.lineTo(innerEndX, innerEndY);
-
-      // Rounded corner at center
-      path.quadraticBezierTo(
-        center.dx,
-        center.dy,
-        innerStartX,
-        innerStartY,
-      );
-
-      path.close();
-
-      canvas.drawPath(path, paint);
-
-      // Draw segment border only if strokeWidth > 0
-      if (strokeWidth > 0) {
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = Colors.white
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = strokeWidth,
-        );
-      }
-
-      // Draw text and image
-      canvas.save();
-      canvas.translate(center.dx, center.dy);
-      canvas.rotate(startAngle + segmentSize / 2);
-
-      // Clip to segment boundaries to prevent text overflow
-      canvas.clipRect(
-        Rect.fromLTRB(
-          centerInset,
-          -radius,
-          radius,
-          radius,
-        ),
-      );
-
-      // Draw icon if available (and no image)
+      // Cache laid-out icon painter
       if (item.iconName != null && item.imagePath == null) {
         final iconData = lucideIconMap[item.iconName];
         if (iconData != null) {
-          final iconPainter = TextPainter(
+          final ip = TextPainter(
             text: TextSpan(
               text: String.fromCharCode(iconData.codePoint),
               style: TextStyle(
@@ -183,302 +105,220 @@ class WheelPainter extends CustomPainter {
             ),
             textDirection: TextDirection.ltr,
           );
-          iconPainter.layout();
-          final iconX = radius - iconPainter.width - 20 * scale;
-          final iconY = -iconPainter.height / 2;
-          iconPainter.paint(canvas, Offset(iconX, iconY));
-        }
-      }
-
-      // Draw image if available, or placeholder if still loading
-      if (item.imagePath != null) {
-        final imageWidth = imageSize;
-        final imageHeight = imageSize;
-        final imageX = radius - imageWidth - 20 * scale;
-        final imageY = -imageHeight / 2;
-        final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
-        final imageRoundedRect = RRect.fromRectAndRadius(
-          imageRect,
-          Radius.circular(cornerRadius),
-        );
-
-        if (imageCache.containsKey(item.imagePath)) {
-          final image = imageCache[item.imagePath!]!;
-
-          canvas.save();
-          canvas.clipRRect(imageRoundedRect);
-
-          paintImage(
-            canvas: canvas,
-            rect: imageRect,
-            image: image,
-            fit: BoxFit.cover,
-          );
-
-          canvas.restore();
+          ip.layout();
+          _iconCache!.add(ip);
         } else {
-          // Draw spinning loading arc
-          final indicatorSize = imageSize * 0.3;
-          final indicatorCenter = Offset(imageX + imageWidth / 2, imageY + imageHeight / 2);
-          final indicatorRect = Rect.fromCenter(center: indicatorCenter, width: indicatorSize, height: indicatorSize);
-          canvas.drawArc(
-            indicatorRect,
-            loadingAngle,
-            pi * 1.2,
-            false,
-            Paint()
-              ..color = Colors.white.withValues(alpha: 0.8)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2.5
-              ..strokeCap = StrokeCap.round,
-          );
+          _iconCache!.add(null);
         }
+      } else {
+        _iconCache!.add(null);
       }
-
-      final hasVisual = (item.imagePath != null) || (item.iconName != null && lucideIconMap.containsKey(item.iconName));
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: item.text,
-          style: textStyle,
-        ),
-        textAlign: TextAlign.right,
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      );
-
-      textPainter.layout();
-
-      final textOffset = hasVisual
-          ? Offset(radius - textPainter.width - imageSize - 30 * scale, -textPainter.height / 2 - textVerticalOffset)
-          : Offset(radius - textPainter.width - 20 * scale, -textPainter.height / 2 - textVerticalOffset);
-
-      textPainter.paint(canvas, textOffset);
-
-      canvas.restore();
 
       startAngle = endAngle;
     }
+  }
 
-    // Draw uniform dark overlay on everything, then redraw the winning segment on top
-    if (overlayOpacity > 0 && winningIndex >= 0 && winningIndex < items.length) {
-      // Draw a single uniform circular overlay covering everything
-      // Extend radius to cover the stroke (stroke extends strokeWidth/2 beyond the radius)
-      final overlayRadius = showBackgroundCircle ? radius + (strokeWidth / 2) + 0.5 : radius + 0.5;
-      canvas.drawCircle(
-        center,
-        overlayRadius,
-        Paint()
-          ..color = overlayColor.withValues(alpha: overlayOpacity * 0.7)
-          ..style = PaintingStyle.fill,
-      );
+  Path _buildSegmentPath(Offset center, double radius, double startAngle, double endAngle) {
+    final segmentSize = endAngle - startAngle;
 
-      // Now redraw the winning segment (fill, text, and image) without overlay
-      final winningItem = items[winningIndex];
-      startAngle = rotation;
-      for (int i = 0; i < winningIndex; i++) {
-        startAngle += arcSize * items[i].weight;
+    final outerStartX = center.dx + radius * cos(startAngle);
+    final outerStartY = center.dy + radius * sin(startAngle);
+    final outerEndX = center.dx + radius * cos(endAngle);
+    final outerEndY = center.dy + radius * sin(endAngle);
+    final innerStartX = center.dx + _centerInset * cos(startAngle);
+    final innerStartY = center.dy + _centerInset * sin(startAngle);
+    final innerEndX = center.dx + _centerInset * cos(endAngle);
+    final innerEndY = center.dy + _centerInset * sin(endAngle);
+
+    final path = Path();
+    path.moveTo(innerStartX, innerStartY);
+
+    path.lineTo(
+      center.dx + (radius - cornerRadius) * cos(startAngle),
+      center.dy + (radius - cornerRadius) * sin(startAngle),
+    );
+
+    path.quadraticBezierTo(
+      outerStartX, outerStartY,
+      center.dx + radius * cos(startAngle + cornerRadius / radius),
+      center.dy + radius * sin(startAngle + cornerRadius / radius),
+    );
+
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle + cornerRadius / radius,
+      segmentSize - (2 * cornerRadius / radius),
+      false,
+    );
+
+    path.quadraticBezierTo(
+      outerEndX, outerEndY,
+      center.dx + (radius - cornerRadius) * cos(endAngle),
+      center.dy + (radius - cornerRadius) * sin(endAngle),
+    );
+
+    path.lineTo(innerEndX, innerEndY);
+
+    path.quadraticBezierTo(
+      center.dx, center.dy,
+      innerStartX, innerStartY,
+    );
+
+    path.close();
+    return path;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _ensureCache(size);
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = min(size.width, size.height) / 2;
+    final scale = radius / 350.0;
+
+    // Background circle (not rotated)
+    if (showBackgroundCircle) {
+      _fillPaint.color = Colors.white;
+      canvas.drawCircle(center, radius, _fillPaint);
+      if (strokeWidth > 0) {
+        _strokePaint.strokeWidth = strokeWidth;
+        canvas.drawCircle(center, radius, _strokePaint);
       }
-      final segmentSize = arcSize * winningItem.weight;
-      final endAngle = startAngle + segmentSize;
+    }
 
-      final centerInset = 50.0;
+    // Apply rotation for all segments via canvas transform
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+    canvas.translate(-center.dx, -center.dy);
 
-      final outerStartX = center.dx + radius * cos(startAngle);
-      final outerStartY = center.dy + radius * sin(startAngle);
-      final outerEndX = center.dx + radius * cos(endAngle);
-      final outerEndY = center.dy + radius * sin(endAngle);
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      final path = _pathCache![i];
 
-      final innerStartX = center.dx + centerInset * cos(startAngle);
-      final innerStartY = center.dy + centerInset * sin(startAngle);
-      final innerEndX = center.dx + centerInset * cos(endAngle);
-      final innerEndY = center.dy + centerInset * sin(endAngle);
+      // Segment fill
+      _fillPaint.color = item.color;
+      canvas.drawPath(path, _fillPaint);
 
-      final path = Path();
+      // Segment stroke
+      if (strokeWidth > 0) {
+        _strokePaint.strokeWidth = strokeWidth;
+        canvas.drawPath(path, _strokePaint);
+      }
 
-      path.moveTo(innerStartX, innerStartY);
-
-      final outerStartInsetX = center.dx + (radius - cornerRadius) * cos(startAngle);
-      final outerStartInsetY = center.dy + (radius - cornerRadius) * sin(startAngle);
-      path.lineTo(outerStartInsetX, outerStartInsetY);
-
-      path.quadraticBezierTo(
-        outerStartX,
-        outerStartY,
-        center.dx + radius * cos(startAngle + cornerRadius / radius),
-        center.dy + radius * sin(startAngle + cornerRadius / radius),
-      );
-
-      path.arcTo(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle + cornerRadius / radius,
-        segmentSize - (2 * cornerRadius / radius),
-        false,
-      );
-
-      path.quadraticBezierTo(
-        outerEndX,
-        outerEndY,
-        center.dx + (radius - cornerRadius) * cos(endAngle),
-        center.dy + (radius - cornerRadius) * sin(endAngle),
-      );
-
-      path.lineTo(innerEndX, innerEndY);
-
-      path.quadraticBezierTo(
-        center.dx,
-        center.dy,
-        innerStartX,
-        innerStartY,
-      );
-
-      path.close();
-
-      // Use saveLayer to draw all parts (fill, text, image) as a single group with unified opacity
-      final layerBounds = Rect.fromCircle(center: center, radius: radius);
-      final layerPaint = Paint()..color = Colors.white.withValues(alpha: overlayOpacity);
-      canvas.saveLayer(layerBounds, layerPaint);
-
-      // Draw winning segment fill (no opacity here - applied by saveLayer)
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = winningItem.color
-          ..style = PaintingStyle.fill,
-      );
-
-      // Draw text and image for winning segment (no opacity here - applied by saveLayer)
+      // Text, icon, image
       canvas.save();
       canvas.translate(center.dx, center.dy);
-      canvas.rotate(startAngle + segmentSize / 2);
+      canvas.rotate(_startAngles![i] + _segmentSizes![i] / 2);
+      canvas.clipRect(Rect.fromLTRB(_centerInset, -radius, radius, radius));
 
-      // Clip to segment boundaries to prevent text overflow
-      canvas.clipRect(
-        Rect.fromLTRB(
-          centerInset,
-          -radius,
-          radius,
-          radius,
-        ),
-      );
-
-      // Draw icon if available and no image (winning segment)
-      if (winningItem.iconName != null && winningItem.imagePath == null) {
-        final iconData = lucideIconMap[winningItem.iconName];
-        if (iconData != null) {
-          final iconPainter = TextPainter(
-            text: TextSpan(
-              text: String.fromCharCode(iconData.codePoint),
-              style: TextStyle(
-                fontSize: imageSize * 0.7,
-                fontFamily: iconData.fontFamily,
-                package: iconData.fontPackage,
-                color: Colors.white.withValues(alpha: 0.9),
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          );
-          iconPainter.layout();
-          final iconX = radius - iconPainter.width - 20 * scale;
-          final iconY = -iconPainter.height / 2;
-          iconPainter.paint(canvas, Offset(iconX, iconY));
-        }
+      // Icon (cached)
+      if (_iconCache![i] != null) {
+        final ip = _iconCache![i]!;
+        ip.paint(canvas, Offset(radius - ip.width - 20 * scale, -ip.height / 2));
       }
 
-      // Draw image if available, or placeholder if still loading (no opacity here - applied by saveLayer)
-      if (winningItem.imagePath != null) {
-        final imageWidth = imageSize;
-        final imageHeight = imageSize;
-        final imageX = radius - imageWidth - 20 * scale;
-        final imageY = -imageHeight / 2;
-        final imageRect = Rect.fromLTWH(imageX, imageY, imageWidth, imageHeight);
-        final imageRoundedRect = RRect.fromRectAndRadius(
-          imageRect,
-          Radius.circular(cornerRadius),
-        );
-
-        if (imageCache.containsKey(winningItem.imagePath)) {
-          final image = imageCache[winningItem.imagePath!]!;
-
-          canvas.save();
-          canvas.clipRRect(imageRoundedRect);
-
-          paintImage(
-            canvas: canvas,
-            rect: imageRect,
-            image: image,
-            fit: BoxFit.cover,
-          );
-
-          canvas.restore();
-        } else {
-          // Draw placeholder
-          canvas.drawRRect(
-            imageRoundedRect,
-            Paint()..color = Colors.white.withValues(alpha: 0.25),
-          );
-          final indicatorSize = imageSize * 0.3;
-          final indicatorCenter = Offset(imageX + imageWidth / 2, imageY + imageHeight / 2);
-          final indicatorRect = Rect.fromCenter(center: indicatorCenter, width: indicatorSize, height: indicatorSize);
-          canvas.drawArc(
-            indicatorRect,
-            loadingAngle,
-            pi * 1.2,
-            false,
-            Paint()
-              ..color = Colors.white.withValues(alpha: 0.8)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2.5
-              ..strokeCap = StrokeCap.round,
-          );
-        }
+      // Image (not cacheable — loaded dynamically)
+      if (item.imagePath != null) {
+        _drawImage(canvas, item, radius, scale);
       }
 
-      final hasVisual = (winningItem.imagePath != null) || (winningItem.iconName != null && lucideIconMap.containsKey(winningItem.iconName));
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: winningItem.text,
-          style: textStyle,
-        ),
-        textAlign: TextAlign.right,
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      );
-
-      textPainter.layout();
-
+      // Text (cached)
+      final tp = _textCache![i];
+      final hasVisual = (item.imagePath != null) || (_iconCache![i] != null);
       final textOffset = hasVisual
-          ? Offset(radius - textPainter.width - imageSize - 30 * scale, -textPainter.height / 2 - textVerticalOffset)
-          : Offset(radius - textPainter.width - 20 * scale, -textPainter.height / 2 - textVerticalOffset);
-
-      textPainter.paint(canvas, textOffset);
+          ? Offset(radius - tp.width - imageSize - 30 * scale, -tp.height / 2 - textVerticalOffset)
+          : Offset(radius - tp.width - 20 * scale, -tp.height / 2 - textVerticalOffset);
+      tp.paint(canvas, textOffset);
 
       canvas.restore();
+    }
 
-      // Restore the saveLayer - this applies the opacity to everything drawn above as a group
+    canvas.restore(); // remove rotation
+
+    // ── Overlay: dark tint + winning segment highlight ──
+    if (overlayOpacity > 0 && winningIndex >= 0 && winningIndex < items.length) {
+      final overlayRadius = showBackgroundCircle ? radius + (strokeWidth / 2) + 0.5 : radius + 0.5;
+      canvas.drawCircle(
+        center, overlayRadius,
+        Paint()..color = overlayColor.withValues(alpha: overlayOpacity * 0.7),
+      );
+
+      // Re-apply rotation for the winning segment redraw
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(rotation);
+      canvas.translate(-center.dx, -center.dy);
+
+      final layerBounds = Rect.fromCircle(center: center, radius: radius);
+      canvas.saveLayer(layerBounds, Paint()..color = Colors.white.withValues(alpha: overlayOpacity));
+
+      final winItem = items[winningIndex];
+      _fillPaint.color = winItem.color;
+      canvas.drawPath(_pathCache![winningIndex], _fillPaint);
+
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(_startAngles![winningIndex] + _segmentSizes![winningIndex] / 2);
+      canvas.clipRect(Rect.fromLTRB(_centerInset, -radius, radius, radius));
+
+      // Icon (cached)
+      if (_iconCache![winningIndex] != null) {
+        final ip = _iconCache![winningIndex]!;
+        ip.paint(canvas, Offset(radius - ip.width - 20 * scale, -ip.height / 2));
+      }
+
+      // Image
+      if (winItem.imagePath != null) {
+        _drawImage(canvas, winItem, radius, scale);
+      }
+
+      // Text (cached)
+      final tp = _textCache![winningIndex];
+      final hasVisual = (winItem.imagePath != null) || (_iconCache![winningIndex] != null);
+      final textOffset = hasVisual
+          ? Offset(radius - tp.width - imageSize - 30 * scale, -tp.height / 2 - textVerticalOffset)
+          : Offset(radius - tp.width - 20 * scale, -tp.height / 2 - textVerticalOffset);
+      tp.paint(canvas, textOffset);
+
+      canvas.restore(); // clip
+      canvas.restore(); // saveLayer
+      canvas.restore(); // rotation
+    }
+  }
+
+  void _drawImage(Canvas canvas, WheelItem item, double radius, double scale) {
+    final imageX = radius - imageSize - 20 * scale;
+    final imageY = -imageSize / 2;
+    final imageRect = Rect.fromLTWH(imageX, imageY, imageSize, imageSize);
+    final imageRoundedRect = RRect.fromRectAndRadius(imageRect, Radius.circular(cornerRadius));
+
+    if (imageCache.containsKey(item.imagePath)) {
+      final image = imageCache[item.imagePath!]!;
+      canvas.save();
+      canvas.clipRRect(imageRoundedRect);
+      paintImage(canvas: canvas, rect: imageRect, image: image, fit: BoxFit.cover);
       canvas.restore();
+    } else {
+      // Spinning loading indicator
+      final indicatorSize = imageSize * 0.3;
+      final indicatorCenter = Offset(imageX + imageSize / 2, imageY + imageSize / 2);
+      canvas.drawArc(
+        Rect.fromCenter(center: indicatorCenter, width: indicatorSize, height: indicatorSize),
+        loadingAngle, pi * 1.2, false,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..strokeCap = StrokeCap.round,
+      );
     }
   }
 
   @override
   bool shouldRepaint(WheelPainter oldDelegate) {
-    // Check if image cache contents changed (not just reference)
-    bool imageCacheChanged = oldDelegate.imageCache.length != imageCache.length ||
-                             oldDelegate.imageCache.keys.any((key) => !imageCache.containsKey(key)) ||
-                             imageCache.keys.any((key) => !oldDelegate.imageCache.containsKey(key));
-
-    return oldDelegate.rotation != rotation ||
-           oldDelegate.items != items ||
-           oldDelegate.cornerRadius != cornerRadius ||
-           oldDelegate.strokeWidth != strokeWidth ||
-           oldDelegate.showBackgroundCircle != showBackgroundCircle ||
-           oldDelegate.imageSize != imageSize ||
-           oldDelegate.overlayOpacity != overlayOpacity ||
-           oldDelegate.winningIndex != winningIndex ||
-           oldDelegate.overlayColor != overlayColor ||
-           oldDelegate.textVerticalOffset != textVerticalOffset ||
-           oldDelegate.loadingAngle != loadingAngle ||
-           imageCacheChanged;
+    // With the repaint Listenable approach, shouldRepaint is only called when
+    // the painter reference changes (i.e. items/config changed). Always repaint.
+    return true;
   }
 }

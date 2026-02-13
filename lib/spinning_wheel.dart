@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' if (dart.library.html) 'dart:html';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -58,7 +59,7 @@ class SpinningWheelState extends State<SpinningWheel>
   late Animation<double> _overlayAnimation;
   final List<AudioPlayer> _audioPool = [];
   int _currentAudioIndex = 0;
-  static const int _poolSize = 8;
+  static const int _poolSize = 300;
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
   bool _isResetting = false;
@@ -68,11 +69,10 @@ class SpinningWheelState extends State<SpinningWheel>
   final List<Timer> _scheduledSounds = [];
   final Map<String, ui.Image> _imageCache = {};
   Timer? _imageRetryTimer;
-  int _winningIndex = -1;
-  double _overlayOpacity = 0.0;
   late AnimationController _loadingController;
-  double _loadingAngle = 0.0;
   late final Listenable _repaintNotifier;
+  final ValueNotifier<int> _repaintVersion = ValueNotifier<int>(0);
+  late WheelPainter _wheelPainter;
 
   @override
   void initState() {
@@ -82,15 +82,11 @@ class SpinningWheelState extends State<SpinningWheel>
       _initializeAudioPool();
     });
 
+    // 1. Create all animation controllers
     _loadingController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _loadingController.addListener(() {
-      _loadingAngle = _loadingController.value * 2 * pi;
-    });
-
-    _startImageLoading();
 
     _controller = AnimationController(
       duration: const Duration(milliseconds: 3000),
@@ -110,36 +106,48 @@ class SpinningWheelState extends State<SpinningWheel>
       curve: Curves.easeInOut,
     ));
 
-    _repaintNotifier = Listenable.merge([_controller, _overlayController, _loadingController]);
+    // 2. Merge all animation sources into one repaint notifier
+    _repaintNotifier = Listenable.merge([
+      _controller, _overlayController, _loadingController, _repaintVersion,
+    ]);
+
+    // 3. Create persistent wheel painter (uses repaint notifier for animation)
+    _wheelPainter = _createWheelPainter();
+
+    // 4. Start image loading
+    _startImageLoading();
+
+    // 5. Set up listeners that update painter's mutable fields directly
+    _loadingController.addListener(() {
+      _wheelPainter.loadingAngle = _loadingController.value * 2 * pi;
+    });
 
     _controller.addListener(() {
       _currentRotation = _animation.value;
+      _wheelPainter.rotation = _currentRotation;
       _updateCurrentSegment();
+
     });
 
     _overlayController.addListener(() {
-      _overlayOpacity = _overlayAnimation.value;
+      _wheelPainter.overlayOpacity = _overlayAnimation.value;
     });
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed && !_isResetting && !_isPullingBack) {
         final winningIndex = _getWinningIndex();
+        _wheelPainter.winningIndex = winningIndex;
         setState(() {
           _isSpinning = false;
-          _winningIndex = winningIndex;
         });
 
-        // Start overlay animation only if enabled (controls both dark overlay and winning segment as one layer)
         if (widget.showWinAnimation) {
           _overlayController.forward().then((_) {
-            // After 2 seconds, fade back to normal
             Future.delayed(const Duration(seconds: 2), () {
               if (mounted) {
                 _overlayController.reverse().then((_) {
                   if (mounted) {
-                    setState(() {
-                      _winningIndex = -1;
-                    });
+                    _wheelPainter.winningIndex = -1;
                   }
                 });
               }
@@ -156,20 +164,34 @@ class SpinningWheelState extends State<SpinningWheel>
     });
   }
 
+  WheelPainter _createWheelPainter() {
+    final fontSize = widget.size / 16;
+    return WheelPainter(
+      items: widget.items,
+      rotation: _currentRotation,
+      textStyle: TextStyle(
+        color: Colors.white,
+        fontSize: (widget.items.length >= 16 ? 24 : fontSize) * widget.textSizeMultiplier,
+        fontWeight: FontWeight.w600,
+      ),
+      cornerRadius: widget.cornerRadius,
+      strokeWidth: widget.strokeWidth,
+      showBackgroundCircle: widget.showBackgroundCircle,
+      imageSize: widget.imageSize,
+      imageCache: _imageCache,
+      overlayColor: widget.overlayColor,
+      textVerticalOffset: widget.size / 700 * 2,
+      repaint: _repaintNotifier,
+    );
+  }
+
   Future<void> _initializeAudioPool() async {
     try {
-      // Initialize all players in parallel instead of sequentially
-      final players = await Future.wait(
-        List.generate(_poolSize, (_) async {
-          final player = AudioPlayer();
-          if (!kIsWeb) {
-            await player.setPlayerMode(PlayerMode.lowLatency);
-          }
-          await player.setSource(AssetSource('audio/click.mp3'));
-          return player;
-        }),
-      );
-      _audioPool.addAll(players);
+      for (int i = 0; i < _poolSize; i++) {
+        final player = AudioPlayer();
+        await player.setPlayerMode(PlayerMode.lowLatency);
+        _audioPool.add(player);
+      }
     } catch (e) {
       // Ignore audio initialization errors
     }
@@ -212,8 +234,8 @@ class SpinningWheelState extends State<SpinningWheel>
       } else {
         _loadingController.stop();
         _imageRetryTimer = null;
-        // Final setState to ensure wheel repaints with all images loaded
-        setState(() {});
+        // Trigger repaint to show newly loaded images
+        _repaintVersion.value++;
       }
     });
   }
@@ -224,12 +246,17 @@ class SpinningWheelState extends State<SpinningWheel>
     for (final item in widget.items) {
       if (item.imagePath != null && !_imageCache.containsKey(item.imagePath)) {
         try {
-          // Skip file-based image loading on web
-          final isWeb = identical(0.0, -0.0); // This is false on VM, effectively skips web
-          if (!isWeb) {
-            // Native platforms only
-            if (!mounted) return;
-            debugPrint('Image loading skipped on web for: ${item.imagePath}');
+          // Load images on native platforms only (web doesn't support file paths)
+          if (!kIsWeb) {
+            final file = File(item.imagePath!);
+            if (await file.exists()) {
+              final bytes = await file.readAsBytes();
+              final codec = await ui.instantiateImageCodec(bytes);
+              final frame = await codec.getNextFrame();
+              if (mounted) {
+                _imageCache[item.imagePath!] = frame.image;
+              }
+            }
           }
         } catch (e) {
           debugPrint('Error loading image ${item.imagePath}: $e');
@@ -241,9 +268,15 @@ class SpinningWheelState extends State<SpinningWheel>
   @override
   void didUpdateWidget(SpinningWheel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload images if items changed or image paths changed
     bool itemsChanged = oldWidget.items != widget.items;
     bool imagePathsChanged = false;
+    bool configChanged = oldWidget.textSizeMultiplier != widget.textSizeMultiplier ||
+        oldWidget.size != widget.size ||
+        oldWidget.cornerRadius != widget.cornerRadius ||
+        oldWidget.strokeWidth != widget.strokeWidth ||
+        oldWidget.showBackgroundCircle != widget.showBackgroundCircle ||
+        oldWidget.imageSize != widget.imageSize ||
+        oldWidget.overlayColor != widget.overlayColor;
 
     if (oldWidget.items.length == widget.items.length) {
       for (int i = 0; i < widget.items.length; i++) {
@@ -252,6 +285,10 @@ class SpinningWheelState extends State<SpinningWheel>
           break;
         }
       }
+    }
+
+    if (itemsChanged || configChanged) {
+      _wheelPainter = _createWheelPainter();
     }
 
     if (itemsChanged || imagePathsChanged) {
@@ -263,12 +300,10 @@ class SpinningWheelState extends State<SpinningWheel>
   void dispose() {
     _imageRetryTimer?.cancel();
     _currentSegmentNotifier.dispose();
+    _repaintVersion.dispose();
     _loadingController.dispose();
     _controller.dispose();
     _overlayController.dispose();
-    for (var timer in _scheduledSounds) {
-      timer.cancel();
-    }
     for (var player in _audioPool) {
       player.dispose();
     }
@@ -281,12 +316,8 @@ class SpinningWheelState extends State<SpinningWheel>
     try {
       final player = _audioPool[_currentAudioIndex];
       _currentAudioIndex = (_currentAudioIndex + 1) % _audioPool.length;
-      player.seek(Duration.zero).then((_) {
-        player.resume().catchError((_) {});
-      }).catchError((_) {
-        // Fallback: full play call
-        player.play(AssetSource('audio/click.mp3')).catchError((_) {});
-      });
+      // play() handles all state management internally - no manual seek/resume needed
+      player.play(AssetSource('audio/click.mp3')).catchError((_) {});
     } catch (e) {
       // Ignore audio errors
     }
@@ -400,12 +431,12 @@ class SpinningWheelState extends State<SpinningWheel>
     // Get current rotation for smooth animation
     final currentRotation = _currentRotation;
 
+    _wheelPainter.winningIndex = -1;
+    _wheelPainter.overlayOpacity = 0.0;
     setState(() {
       _isSpinning = false;
       _isResetting = true;
       _isPullingBack = false;
-      _winningIndex = -1;
-      _overlayOpacity = 0.0;
     });
 
     // Reset overlay controller
@@ -440,9 +471,6 @@ class SpinningWheelState extends State<SpinningWheel>
 
   void spin() {
     if (_isSpinning) return;
-
-    // Play a click immediately in user-gesture context to unlock audio on iOS Safari
-    _playClickSoundFromPool();
 
     setState(() {
       _isSpinning = true;
@@ -576,8 +604,6 @@ class SpinningWheelState extends State<SpinningWheel>
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = widget.size / 16;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -610,31 +636,8 @@ class SpinningWheelState extends State<SpinningWheel>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: spin,
-                child: ListenableBuilder(
-                  listenable: _repaintNotifier,
-                  builder: (context, _) {
-                    return CustomPaint(
-                      painter: WheelPainter(
-                        items: widget.items,
-                        rotation: _currentRotation,
-                        textStyle: TextStyle(
-                          color: Colors.white,
-                          fontSize: (widget.items.length >= 16 ? 24 : fontSize) * widget.textSizeMultiplier,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        cornerRadius: widget.cornerRadius,
-                        strokeWidth: widget.strokeWidth,
-                        showBackgroundCircle: widget.showBackgroundCircle,
-                        imageSize: widget.imageSize,
-                        imageCache: _imageCache,
-                        overlayOpacity: _overlayOpacity,
-                        winningIndex: _winningIndex,
-                        overlayColor: widget.overlayColor,
-                        textVerticalOffset: widget.size / 700 * 2,
-                        loadingAngle: _loadingAngle,
-                      ),
-                    );
-                  },
+                child: CustomPaint(
+                  painter: _wheelPainter,
                 ),
               ),
             ),
