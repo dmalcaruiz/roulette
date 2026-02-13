@@ -1260,6 +1260,7 @@ class _WheelDemoState extends State<WheelDemo> {
                     scrollController: _sheetScrollController,
                     snappingSheetController: _snappingSheetController,
                     isReordering: _isReordering,
+                    upperSnapHeight: upperSnapHeight,
                     child: Container(
                       decoration: const BoxDecoration(
                         color: Colors.white,
@@ -1942,12 +1943,14 @@ class _SheetScrollWrapper extends StatefulWidget {
   final ScrollController scrollController;
   final SnappingSheetController snappingSheetController;
   final ValueNotifier<bool> isReordering;
+  final double upperSnapHeight;
   final Widget child;
 
   const _SheetScrollWrapper({
     required this.scrollController,
     required this.snappingSheetController,
     required this.isReordering,
+    required this.upperSnapHeight,
     required this.child,
   });
 
@@ -1961,7 +1964,8 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
 
   void _snapToClosest() {
     final current = widget.snappingSheetController.currentPosition;
-    final positions = <double>[-34, 460];
+    final upperSnap = widget.upperSnapHeight;
+    final positions = <double>[-34, 460, upperSnap];
     double bestDist = double.infinity;
     double bestPos = 460;
     final dragDelta = current - _dragStartSheetPos;
@@ -1972,10 +1976,15 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
         bestPos = pos;
       }
     }
-    if (dragDelta < -80 && bestPos > -34) {
-      bestPos = -34;
-    } else if (dragDelta > 80 && bestPos < 460) {
-      bestPos = 460;
+    // Bias toward the direction of the drag
+    if (dragDelta < -80) {
+      // Dragging down — find the nearest position below current
+      final below = positions.where((p) => p < _dragStartSheetPos).toList()..sort();
+      if (below.isNotEmpty) bestPos = below.last;
+    } else if (dragDelta > 80) {
+      // Dragging up — find the nearest position above current
+      final above = positions.where((p) => p > _dragStartSheetPos).toList()..sort();
+      if (above.isNotEmpty) bestPos = above.first;
     }
     widget.snappingSheetController.snapToPosition(
       SnappingPosition.pixels(
@@ -1998,7 +2007,7 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
         final isDraggingDown = dy > 0;
         final isDraggingUp = dy < 0;
         final sheetPos = widget.snappingSheetController.currentPosition;
-        final atBottomSnap = sheetPos <= 0;
+
 
         if (_isDraggingSheet && widget.isReordering.value) {
           // Reorder just started — cancel sheet drag and snap back
@@ -2016,8 +2025,8 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           if (widget.snappingSheetController.currentlySnapping) {
             widget.snappingSheetController.stopCurrentSnapping();
           }
-        } else if (atBottomSnap && isDraggingUp) {
-          // At bottom snap and swiping up — enter sheet-drag mode
+        } else if (atTop && isDraggingUp && !widget.isReordering.value) {
+          // At top of scroll and swiping up — enter sheet-drag mode
           debugPrint('[SHEET] drag started (up from bottom)');
           _isDraggingSheet = true;
           _dragStartSheetPos = sheetPos;
