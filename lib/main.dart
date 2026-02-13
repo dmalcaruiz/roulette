@@ -13,6 +13,7 @@ import 'wheel_manager.dart';
 import 'wheel_editor.dart';
 import 'push_down_button.dart';
 import 'swipeable_action_cell.dart';
+import 'color_utils.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -837,40 +838,71 @@ class _WheelDemoState extends State<WheelDemo> {
   }
 
   Widget _buildWheelCard(WheelConfig wheel, bool isSelected, {bool showDragHandle = false, VoidCallback? onTap}) {
-    return Material(
-      color: Colors.transparent,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFE0F2FE) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8),
-              width: 1.5,
+    final faceColor = isSelected ? const Color(0xFFE0F2FE) : Colors.white;
+    final borderColor = isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8);
+    final bottomColor = oklchShadow(isSelected ? borderColor : faceColor);
+    final innerStrokeColor = isSelected ? borderColor : oklchShadow(faceColor, lightnessReduction: 0.06);
+    const double bottomDepth = 6.5;
+    const double outerStrokeWidth = 3.5;
+    const double innerStrokeWidth = 2.5;
+    const double borderRadius = 21;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap ?? () {
+        setState(() {
+          _currentWheel = wheel;
+          _previewWheel = null;
+          _editingWheel = null;
+        });
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Bottom face
+          Positioned(
+            left: 0,
+            right: 0,
+            top: bottomDepth,
+            bottom: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: bottomColor,
+                borderRadius: BorderRadius.circular(borderRadius),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x40000000),
+                    spreadRadius: outerStrokeWidth,
+                    blurRadius: 0,
+                  ),
+                ],
+              ),
             ),
           ),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap ?? () {
-              setState(() {
-                _currentWheel = wheel;
-                _previewWheel = null;
-                _editingWheel = null;
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // Top face
+          Padding(
+            padding: const EdgeInsets.only(bottom: bottomDepth),
+            child: Container(
+              decoration: BoxDecoration(
+                color: faceColor,
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(
+                  color: innerStrokeColor,
+                  width: isSelected ? 3 : innerStrokeWidth,
+                  strokeAlign: BorderSide.strokeAlignInside,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
-                  if (showDragHandle) ...[
-                    Icon(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Icon(
                       LucideIcons.gripVertical,
                       color: const Color(0xFF1E1E2C).withValues(alpha: 0.3),
                       size: 22,
                     ),
-                    const SizedBox(width: 8),
-                  ],
+                  ),
                   Container(
                     width: 40,
                     height: 40,
@@ -909,11 +941,12 @@ class _WheelDemoState extends State<WheelDemo> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 14),
                 ],
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
