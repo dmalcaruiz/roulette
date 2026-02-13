@@ -947,6 +947,7 @@ class _WheelDemoState extends State<WheelDemo> {
 
   Widget _buildWheelManagerPanel() {
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1669,6 +1670,7 @@ class _WheelsScreenState extends State<_WheelsScreen> {
                       ),
                     )
                   : ReorderableListView.builder(
+                      physics: const ClampingScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       buildDefaultDragHandles: false,
                       itemCount: _wheels.length,

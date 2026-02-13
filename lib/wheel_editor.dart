@@ -313,6 +313,7 @@ class _WheelEditorState extends State<WheelEditor> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                     child: Column(
                       children: [
@@ -520,6 +521,7 @@ class _WheelEditorState extends State<WheelEditor> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
