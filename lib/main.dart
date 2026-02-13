@@ -1959,15 +1959,24 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
         final hasClients = sc.hasClients;
         final atTop = !hasClients || sc.offset <= 0;
         final isDraggingDown = dy > 0;
+        final isDraggingUp = dy < 0;
+        final sheetPos = widget.snappingSheetController.currentPosition;
+        final atBottomSnap = sheetPos <= 0;
 
         if (_isDraggingSheet) {
           // Already in sheet-drag mode — keep driving the sheet
-          final current = widget.snappingSheetController.currentPosition;
-          widget.snappingSheetController.setSnappingSheetPosition(current - dy);
+          widget.snappingSheetController.setSnappingSheetPosition(sheetPos - dy);
         } else if (atTop && isDraggingDown) {
           // At top of scroll and pulling down — enter sheet-drag mode
           _isDraggingSheet = true;
-          _dragStartSheetPos = widget.snappingSheetController.currentPosition;
+          _dragStartSheetPos = sheetPos;
+          if (widget.snappingSheetController.currentlySnapping) {
+            widget.snappingSheetController.stopCurrentSnapping();
+          }
+        } else if (atBottomSnap && isDraggingUp) {
+          // At bottom snap and swiping up — enter sheet-drag mode
+          _isDraggingSheet = true;
+          _dragStartSheetPos = sheetPos;
           if (widget.snappingSheetController.currentlySnapping) {
             widget.snappingSheetController.stopCurrentSnapping();
           }
@@ -1991,9 +2000,11 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
               bestPos = pos;
             }
           }
-          // If dragged down more than 80px from start, bias to lower snap
+          // If dragged significantly, bias in that direction
           if (dragDelta < -80 && bestPos > -34) {
             bestPos = -34;
+          } else if (dragDelta > 80 && bestPos < 460) {
+            bestPos = 460;
           }
           widget.snappingSheetController.snapToPosition(
             SnappingPosition.pixels(
