@@ -12,7 +12,8 @@
       "Bash(git add:*)",
       "Bash(git check-ignore:*)",
       "Bash(git hash-object:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(cat:*)"
     ]
   }
 }

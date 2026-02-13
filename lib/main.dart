@@ -843,7 +843,6 @@ class _WheelDemoState extends State<WheelDemo> {
     final bottomColor = oklchShadow(isSelected ? borderColor : faceColor);
     final innerStrokeColor = isSelected ? borderColor : oklchShadow(faceColor, lightnessReduction: 0.06);
     const double bottomDepth = 6.5;
-    const double outerStrokeWidth = 3.5;
     const double innerStrokeWidth = 2.5;
     const double borderRadius = 21;
 
@@ -869,13 +868,6 @@ class _WheelDemoState extends State<WheelDemo> {
               decoration: BoxDecoration(
                 color: bottomColor,
                 borderRadius: BorderRadius.circular(borderRadius),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x40000000),
-                    spreadRadius: outerStrokeWidth,
-                    blurRadius: 0,
-                  ),
-                ],
               ),
             ),
           ),
@@ -1170,8 +1162,8 @@ class _WheelDemoState extends State<WheelDemo> {
                 // Fixed spin controls at screen bottom (behind wheel in z-order)
                 if (_previewWheel != null || _currentWheel != null)
                   Positioned(
-                    left: 16,
-                    right: 16,
+                    left: 32,
+                    right: 32,
                     bottom: 16,
                   child: Row(
                     children: [

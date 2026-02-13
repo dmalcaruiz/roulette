@@ -1250,7 +1250,6 @@ class _SegmentCard3D extends StatelessWidget {
   final Widget child;
 
   static const double _bottomDepth = 6.5;
-  static const double _outerStrokeWidth = 3.5;
   static const double _innerStrokeWidth = 2.5;
   static const double _borderRadius = 21;
 
@@ -1264,7 +1263,6 @@ class _SegmentCard3D extends StatelessWidget {
   Widget build(BuildContext context) {
     final shadowSource = expandedBorderColor ?? color;
     final bottomColor = oklchShadow(shadowSource);
-    final outerStrokeColor = bottomColor.withValues(alpha: 0.25);
     final innerStrokeColor = oklchShadow(color, lightnessReduction: 0.06);
     final isExpanded = expandedBorderColor != null;
 
@@ -1283,13 +1281,6 @@ class _SegmentCard3D extends StatelessWidget {
             decoration: BoxDecoration(
               color: bottomColor,
               borderRadius: BorderRadius.circular(_borderRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: outerStrokeColor,
-                  spreadRadius: _outerStrokeWidth,
-                  blurRadius: 0,
-                ),
-              ],
             ),
           ),
         ),
