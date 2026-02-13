@@ -267,6 +267,26 @@ class WheelPainter extends CustomPainter {
       canvas.rotate(_startAngles![i] + _segmentSizes![i] / 2);
       canvas.clipRect(Rect.fromLTRB(centerInset, -radius, radius, radius));
 
+      // Fade text/icons/images for segments being added or removed
+      double contentOpacity = 1.0;
+      if (fromItems != null && i < fromItems!.length && transition < 1.0) {
+        final fromWeight = fromItems![i].weight;
+        final toWeight = items[i].weight;
+        if (fromWeight <= 0.01) {
+          // Segment is being added — fade in
+          contentOpacity = transition;
+        } else if (toWeight <= 0.01) {
+          // Segment is being removed — fade out
+          contentOpacity = 1.0 - transition;
+        }
+      }
+      if (contentOpacity < 1.0) {
+        canvas.saveLayer(
+          Rect.fromLTRB(-radius, -radius, radius, radius),
+          Paint()..color = Color.fromARGB((contentOpacity * 255).round(), 255, 255, 255),
+        );
+      }
+
       // Icon (cached)
       if (_iconCache![i] != null) {
         final ip = _iconCache![i]!;
@@ -286,6 +306,9 @@ class WheelPainter extends CustomPainter {
           : Offset(radius - tp.width - 20 * scale, -tp.height / 2 - textVerticalOffset);
       tp.paint(canvas, textOffset);
 
+      if (contentOpacity < 1.0) {
+        canvas.restore(); // saveLayer
+      }
       canvas.restore();
     }
 

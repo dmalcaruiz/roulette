@@ -309,9 +309,9 @@ class _WheelEditorState extends State<WheelEditor> with TickerProviderStateMixin
   }
 
   void _duplicateSegment(int index) {
+    final original = _segments[index];
+    final id = '${_segmentIdCounter++}';
     setState(() {
-      final original = _segments[index];
-      final id = '${_segmentIdCounter++}';
       final duplicate = _SegmentData(
         id: id,
         text: original.text,
@@ -322,7 +322,15 @@ class _WheelEditorState extends State<WheelEditor> with TickerProviderStateMixin
       _weightControllers[id] = TextEditingController(text: original.weight.toStringAsFixed(1));
       _segmentTextControllers[id] = TextEditingController(text: original.text);
     });
+    // Send preview with near-zero weight so wheel creates the segment tiny
+    _animatingWeights[id] = 0.01;
     _updatePreview(immediate: true);
+    // Next frame: remove override so wheel animates from 0.01 → real weight
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _animatingWeights.remove(id);
+      _updatePreview(immediate: true);
+    });
   }
 
   void _reorderSegments(int oldIndex, int newIndex) {
@@ -835,6 +843,9 @@ class _WheelEditorState extends State<WheelEditor> with TickerProviderStateMixin
             itemBuilder: (context, index) {
               try {
                 final segment = _segments[index];
+                if (_pendingRemoval.contains(segment.id)) {
+                  return SizedBox.shrink(key: ValueKey(segment.id));
+                }
                 final isExpanded = _expandedSegmentIndex == index;
 
                 final card = GestureDetector(
