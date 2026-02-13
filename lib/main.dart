@@ -2006,8 +2006,9 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
         final sc = widget.scrollController;
         final hasClients = sc.hasClients;
         final atTop = !hasClients || sc.offset <= 0;
+
         final isDraggingDown = dy > 0;
-        final isDraggingUp = dy < 0;
+
         final sheetPos = widget.snappingSheetController.currentPosition;
         final isHorizontal = dx.abs() > dy.abs() && dx.abs() > 1;
 
@@ -2029,13 +2030,6 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           widget.snappingSheetController.setSnappingSheetPosition(sheetPos - dy);
         } else if (atTop && isDraggingDown && !widget.isReordering.value) {
           // At top of scroll and pulling down — enter sheet-drag mode
-          _isDraggingSheet = true;
-          _dragStartSheetPos = sheetPos;
-          if (widget.snappingSheetController.currentlySnapping) {
-            widget.snappingSheetController.stopCurrentSnapping();
-          }
-        } else if (atTop && isDraggingUp && !widget.isReordering.value) {
-          // At top of scroll and swiping up — enter sheet-drag mode
           _isDraggingSheet = true;
           _dragStartSheetPos = sheetPos;
           if (widget.snappingSheetController.currentlySnapping) {
