@@ -186,6 +186,9 @@ class SpinningWheelState extends State<SpinningWheel>
   }
 
   Future<void> _initializeAudioPool() async {
+    // Disable audio on web - too laggy
+    if (kIsWeb) return;
+
     try {
       for (int i = 0; i < _poolSize; i++) {
         final player = AudioPlayer();
@@ -372,6 +375,9 @@ class SpinningWheelState extends State<SpinningWheel>
   }
 
   void _preScheduleSounds(double startRotation, double finalRotation, Duration duration) {
+    // Disable audio on web - too laggy
+    if (kIsWeb) return;
+
     // Cancel any previously scheduled sounds
     for (var timer in _scheduledSounds) {
       timer.cancel();
