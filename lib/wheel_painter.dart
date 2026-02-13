@@ -261,55 +261,55 @@ class WheelPainter extends CustomPainter {
         canvas.drawPath(path, _strokePaint);
       }
 
-      // Text, icon, image
-      canvas.save();
-      canvas.translate(center.dx, center.dy);
-      canvas.rotate(_startAngles![i] + _segmentSizes![i] / 2);
-      canvas.clipRect(Rect.fromLTRB(centerInset, -radius, radius, radius));
+      // Text, icon, image — skip when segment is too tiny
+      if (_segmentSizes![i] > 0.15) {
+        canvas.save();
+        canvas.translate(center.dx, center.dy);
+        canvas.rotate(_startAngles![i] + _segmentSizes![i] / 2);
+        canvas.clipRect(Rect.fromLTRB(centerInset, -radius, radius, radius));
 
-      // Fade text/icons/images for segments being added or removed
-      double contentOpacity = 1.0;
-      if (fromItems != null && i < fromItems!.length && transition < 1.0) {
-        final fromWeight = fromItems![i].weight;
-        final toWeight = items[i].weight;
-        if (fromWeight <= 0.01) {
-          // Segment is being added — fade in
-          contentOpacity = transition;
-        } else if (toWeight <= 0.01) {
-          // Segment is being removed — fade out
-          contentOpacity = 1.0 - transition;
+        // Fade content for segments being added or removed
+        double contentOpacity = 1.0;
+        if (fromItems != null && i < fromItems!.length && transition < 1.0) {
+          final fromWeight = fromItems![i].weight;
+          final toWeight = items[i].weight;
+          if (fromWeight <= 0.01) {
+            contentOpacity = transition;
+          } else if (toWeight <= 0.01) {
+            contentOpacity = 1.0 - transition;
+          }
         }
-      }
-      if (contentOpacity < 1.0) {
-        canvas.saveLayer(
-          Rect.fromLTRB(-radius, -radius, radius, radius),
-          Paint()..color = Color.fromARGB((contentOpacity * 255).round(), 255, 255, 255),
-        );
-      }
+        if (contentOpacity < 1.0) {
+          canvas.saveLayer(
+            Rect.fromLTRB(-radius, -radius, radius, radius),
+            Paint()..color = Color.fromARGB((contentOpacity * 255).round(), 255, 255, 255),
+          );
+        }
 
-      // Icon (cached)
-      if (_iconCache![i] != null) {
-        final ip = _iconCache![i]!;
-        ip.paint(canvas, Offset(radius - ip.width - 20 * scale, -ip.height / 2));
-      }
+        // Icon (cached)
+        if (_iconCache![i] != null) {
+          final ip = _iconCache![i]!;
+          ip.paint(canvas, Offset(radius - ip.width - 20 * scale, -ip.height / 2));
+        }
 
-      // Image (not cacheable — loaded dynamically)
-      if (item.imagePath != null) {
-        _drawImage(canvas, item, radius, scale);
-      }
+        // Image (not cacheable — loaded dynamically)
+        if (item.imagePath != null) {
+          _drawImage(canvas, item, radius, scale);
+        }
 
-      // Text (cached)
-      final tp = _textCache![i];
-      final hasVisual = (item.imagePath != null) || (_iconCache![i] != null);
-      final textOffset = hasVisual
-          ? Offset(radius - tp.width - imageSize - 30 * scale, -tp.height / 2 - textVerticalOffset)
-          : Offset(radius - tp.width - 20 * scale, -tp.height / 2 - textVerticalOffset);
-      tp.paint(canvas, textOffset);
+        // Text (cached)
+        final tp = _textCache![i];
+        final hasVisual = (item.imagePath != null) || (_iconCache![i] != null);
+        final textOffset = hasVisual
+            ? Offset(radius - tp.width - imageSize - 30 * scale, -tp.height / 2 - textVerticalOffset)
+            : Offset(radius - tp.width - 20 * scale, -tp.height / 2 - textVerticalOffset);
+        tp.paint(canvas, textOffset);
 
-      if (contentOpacity < 1.0) {
-        canvas.restore(); // saveLayer
+        if (contentOpacity < 1.0) {
+          canvas.restore(); // saveLayer
+        }
+        canvas.restore();
       }
-      canvas.restore();
     }
 
     canvas.restore(); // remove rotation
