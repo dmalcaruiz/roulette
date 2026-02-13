@@ -26,6 +26,7 @@ class SpinningWheel extends StatefulWidget {
   final Color overlayColor;
   final bool showWinAnimation;
   final double headerOpacity;
+  final double headerSizeProgress;
 
   const SpinningWheel({
     super.key,
@@ -45,6 +46,7 @@ class SpinningWheel extends StatefulWidget {
     this.overlayColor = Colors.black,
     this.showWinAnimation = true,
     this.headerOpacity = 1.0,
+    this.headerSizeProgress = 1.0,
   });
 
   @override
@@ -616,23 +618,26 @@ class SpinningWheelState extends State<SpinningWheel>
         Opacity(
           opacity: widget.headerOpacity,
           child: SizedBox(
-            height: (56 * widget.headerTextSizeMultiplier + 16) * widget.headerOpacity,
-            child: ValueListenableBuilder<String>(
-              valueListenable: _currentSegmentNotifier,
-              builder: (context, segment, _) {
-                return Text(
-                  segment,
-                  style: TextStyle(
-                    fontSize: 56 * widget.headerTextSizeMultiplier,
-                    fontWeight: FontWeight.w700,
-                    color: widget.headerTextColor,
-                  ),
-                );
-              },
+            height: (56 * widget.headerTextSizeMultiplier + 16) * widget.headerSizeProgress,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ValueListenableBuilder<String>(
+                valueListenable: _currentSegmentNotifier,
+                builder: (context, segment, _) {
+                  return Text(
+                    segment,
+                    style: TextStyle(
+                      fontSize: 56 * widget.headerTextSizeMultiplier,
+                      fontWeight: FontWeight.w700,
+                      color: widget.headerTextColor,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
-        SizedBox(height: 8 * widget.headerOpacity),
+        SizedBox(height: 16 * widget.headerSizeProgress),
         Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,

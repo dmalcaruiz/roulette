@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' show min, pi;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1142,11 +1143,17 @@ class _WheelDemoState extends State<WheelDemo> {
       final upperSnapHeight = safeAreaHeight - 16;
       const midSnapHeight = 460.0;
 
-      return Scaffold(
-        body: SafeArea(
-          child: Container(
-            color: _backgroundColor,
-            child: Stack(
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarContrastEnforced: false,
+        ),
+        child: Scaffold(
+          backgroundColor: _backgroundColor,
+          extendBody: true,
+          extendBodyBehindAppBar: true,
+          body: Stack(
               children: [
                 // Fixed spin controls at screen bottom
                 if (_previewWheel != null || _currentWheel != null)
@@ -1164,7 +1171,7 @@ class _WheelDemoState extends State<WheelDemo> {
                           right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
                         ),
                       ),
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.of(context).padding.bottom),
                       child: Row(
                         children: [
                           PushDownButton(
@@ -1263,9 +1270,10 @@ class _WheelDemoState extends State<WheelDemo> {
                       builder: (context, sheetHeight, _) {
                         final availableHeight = screenHeight - sheetHeight - _grabbingHeight + 45;
                           final spacerProgress = (sheetHeight / midSnapHeight).clamp(0.0, 1.0);
-                          final spacerHeight = _bottomControlsHeight * (1.0 - spacerProgress);
-                          final headerOpacity = 1.0 - spacerProgress;
-                          final estimatedHeaderHeight = 72.0 * headerOpacity;
+                          final spacerHeight = 15.0 + (_bottomControlsHeight + 36) * (1.0 - spacerProgress);
+                          final headerSizeProgress = 1.0 - spacerProgress;
+                          final headerOpacity = (headerSizeProgress * 2.0 - 1.0).clamp(0.0, 1.0);
+                          final estimatedHeaderHeight = 72.0 * headerSizeProgress;
                           final wheelPadding = 140.0 - 80.0 * spacerProgress;
                           final maxWheelSize = min(availableHeight - wheelPadding - estimatedHeaderHeight, effectiveWheelSize);
                           final clampedWheelSize = maxWheelSize.clamp(80.0, effectiveWheelSize);
@@ -1307,6 +1315,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                             overlayColor: _overlayColor,
                                             showWinAnimation: _showWinAnimation,
                                             headerOpacity: headerOpacity,
+                                            headerSizeProgress: headerSizeProgress,
                                           ),
                                         ),
                                         )
@@ -1394,7 +1403,6 @@ class _WheelDemoState extends State<WheelDemo> {
             ],
           ),
         ),
-      ),
     );
     }
 
