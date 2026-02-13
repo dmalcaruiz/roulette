@@ -59,6 +59,7 @@ class _WheelEditorState extends State<WheelEditor> {
   late bool _showBackgroundCircle;
   late double _centerMarkerSize;
   int? _expandedSegmentIndex;
+  int _selectedTabIndex = 0;
   Timer? _keyRepeatTimer;
   Timer? _previewDebounceTimer;
   final Map<String, TextEditingController> _weightControllers = {};
@@ -520,6 +521,101 @@ class _WheelEditorState extends State<WheelEditor> {
     );
   }
 
+  Widget _buildTabBar() {
+    const borderRadius = 16.0;
+    final backColor = const Color(0xFFE4E4E7);
+    final activeColor = Colors.white;
+    final activeStroke = const Color(0xFFD4D4D8);
+
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: backColor,
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: List.generate(2, (index) {
+          final isActive = _selectedTabIndex == index;
+          final label = index == 0 ? 'Segments' : 'Style';
+          final icon = index == 0 ? LucideIcons.layoutList : LucideIcons.paintbrush;
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedTabIndex = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                decoration: BoxDecoration(
+                  color: isActive ? activeColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(borderRadius - 2),
+                  border: isActive ? Border.all(color: activeStroke, width: 1.5) : null,
+                  boxShadow: isActive
+                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 16, color: isActive ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.4)),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isActive ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildStyleTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        _settingSlider('Segment Text', _textSize, 0.05, 1.5, 29, (v) { setState(() { _textSize = v; _textSizeController.text = v.toStringAsFixed(2); }); _updatePreview(); }),
+        _settingSlider('Header Text', _headerTextSize, 0.05, 2.0, 200, (v) { setState(() { _headerTextSize = v; _headerTextSizeController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+        _settingSlider('Image Size', _imageSize, 20, 150, 130, (v) { setState(() { _imageSize = v; _imageSizeController.text = v.toStringAsFixed(0); }); _updatePreview(); }),
+        _settingSlider('Corner Radius', _cornerRadius, 0, 100, 40, (v) { setState(() { _cornerRadius = v; _cornerRadiusController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+        _settingSlider('Stroke Width', _strokeWidth, 0, 10, 100, (v) { setState(() { _strokeWidth = v; _strokeWidthController.text = v.toStringAsFixed(1); }); _updatePreview(); }),
+        _settingSlider('Center Marker', _centerMarkerSize, 100, 250, 150, (v) { setState(() { _centerMarkerSize = v; _centerMarkerSizeController.text = v.toStringAsFixed(0); }); _updatePreview(); }),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () {
+            setState(() => _showBackgroundCircle = !_showBackgroundCircle);
+            _updatePreview();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: _showBackgroundCircle ? const Color(0xFF38BDF8).withValues(alpha: 0.12) : const Color(0xFFF4F4F5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _showBackgroundCircle ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                Icon(_showBackgroundCircle ? LucideIcons.checkCircle : LucideIcons.circle, color: _showBackgroundCircle ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8), size: 22),
+                const SizedBox(width: 12),
+                Text('Background Circle', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _showBackgroundCircle ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.5))),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -533,7 +629,7 @@ class _WheelEditorState extends State<WheelEditor> {
             children: [
               Expanded(
                 child: Text(
-                  widget.initialConfig != null ? 'Edit Wheel' : 'Edit Wheel',
+                  'Edit Wheel',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -559,19 +655,12 @@ class _WheelEditorState extends State<WheelEditor> {
             onChanged: (value) => _updatePreview(),
           ),
           const SizedBox(height: 16),
-          // Settings button — opens all sliders in a bottom sheet
-          _editorPillButton(
-            icon: LucideIcons.settings,
-            label: 'Wheel Settings',
-            onTap: _openSettingsSheet,
-            color: const Color(0xFFF4F4F5),
-            textColor: const Color(0xFF1E1E2C),
-            borderColor: const Color(0xFFD4D4D8),
-          ),
-          const SizedBox(height: 24),
-          const Text('Segments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 14),
-          ReorderableListView.builder(
+          _buildTabBar(),
+          if (_selectedTabIndex == 1)
+            _buildStyleTab()
+          else ...[
+            const SizedBox(height: 14),
+            ReorderableListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
@@ -985,6 +1074,7 @@ class _WheelEditorState extends State<WheelEditor> {
             textColor: Colors.white,
           ),
           const SizedBox(height: 32),
+          ],
         ],
       ),
     );

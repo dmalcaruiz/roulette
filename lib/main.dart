@@ -1091,7 +1091,7 @@ class _WheelDemoState extends State<WheelDemo> {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
         border: Border(
           top: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
           left: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
@@ -1252,17 +1252,20 @@ class _WheelDemoState extends State<WheelDemo> {
                 grabbingHeight: _grabbingHeight,
                 grabbing: _buildGrabbingHandle(),
                 sheetBelow: SnappingSheetContent(
-                  draggable: true,
-                  childScrollController: _sheetScrollController,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        left: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
-                        right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                  draggable: false,
+                  child: _SheetScrollWrapper(
+                    scrollController: _sheetScrollController,
+                    snappingSheetController: _snappingSheetController,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        border: Border(
+                          left: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                          right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                        ),
                       ),
+                      child: _buildWheelEditorPanel(showClose: true),
                     ),
-                    child: _buildWheelEditorPanel(showClose: true),
                   ),
                 ),
                 // Main content above the sheet
@@ -1923,6 +1926,85 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
           const Spacer(),
         ],
       ),
+    );
+  }
+}
+
+class _SheetScrollWrapper extends StatefulWidget {
+  final ScrollController scrollController;
+  final SnappingSheetController snappingSheetController;
+  final Widget child;
+
+  const _SheetScrollWrapper({
+    required this.scrollController,
+    required this.snappingSheetController,
+    required this.child,
+  });
+
+  @override
+  State<_SheetScrollWrapper> createState() => _SheetScrollWrapperState();
+}
+
+class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
+  bool _isDraggingSheet = false;
+  double _dragStartSheetPos = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerMove: (event) {
+        final dy = event.delta.dy;
+        final sc = widget.scrollController;
+        final hasClients = sc.hasClients;
+        final atTop = !hasClients || sc.offset <= 0;
+        final isDraggingDown = dy > 0;
+
+        if (_isDraggingSheet) {
+          // Already in sheet-drag mode — keep driving the sheet
+          final current = widget.snappingSheetController.currentPosition;
+          widget.snappingSheetController.setSnappingSheetPosition(current - dy);
+        } else if (atTop && isDraggingDown) {
+          // At top of scroll and pulling down — enter sheet-drag mode
+          _isDraggingSheet = true;
+          _dragStartSheetPos = widget.snappingSheetController.currentPosition;
+          if (widget.snappingSheetController.currentlySnapping) {
+            widget.snappingSheetController.stopCurrentSnapping();
+          }
+        }
+      },
+      onPointerUp: (_) {
+        if (_isDraggingSheet) {
+          _isDraggingSheet = false;
+          // Snap to the nearest position
+          final current = widget.snappingSheetController.currentPosition;
+          // Determine best snap: find closest among the known positions
+          final positions = <double>[-34, 460];
+          double bestDist = double.infinity;
+          double bestPos = 460;
+          // Also use velocity direction: if we dragged down significantly, bias downward
+          final dragDelta = current - _dragStartSheetPos;
+          for (final pos in positions) {
+            final dist = (current - pos).abs();
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestPos = pos;
+            }
+          }
+          // If dragged down more than 80px from start, bias to lower snap
+          if (dragDelta < -80 && bestPos > -34) {
+            bestPos = -34;
+          }
+          widget.snappingSheetController.snapToPosition(
+            SnappingPosition.pixels(
+              positionPixels: bestPos,
+              snappingCurve: Curves.easeOutExpo,
+              snappingDuration: const Duration(milliseconds: 900),
+            ),
+          );
+        }
+      },
+      child: widget.child,
     );
   }
 }
