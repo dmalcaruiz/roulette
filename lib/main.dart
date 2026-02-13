@@ -1960,6 +1960,7 @@ class _SheetScrollWrapper extends StatefulWidget {
 
 class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
   bool _isDraggingSheet = false;
+  bool _isSwiping = false;
   double _dragStartSheetPos = 0;
 
   void _snapToClosest() {
@@ -2000,6 +2001,7 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerMove: (event) {
+        final dx = event.delta.dx;
         final dy = event.delta.dy;
         final sc = widget.scrollController;
         final hasClients = sc.hasClients;
@@ -2007,19 +2009,26 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
         final isDraggingDown = dy > 0;
         final isDraggingUp = dy < 0;
         final sheetPos = widget.snappingSheetController.currentPosition;
+        final isHorizontal = dx.abs() > dy.abs() && dx.abs() > 1;
 
+        if (_isSwiping) {
+          // Already swiping horizontally — ignore
+          return;
+        }
 
-        if (_isDraggingSheet && widget.isReordering.value) {
-          // Reorder just started — cancel sheet drag and snap back
-          debugPrint('[SHEET] drag cancelled (reorder took over)');
+        if (_isDraggingSheet && (widget.isReordering.value || isHorizontal)) {
+          // Reorder or swipe action started — cancel sheet drag and snap back
           _isDraggingSheet = false;
+          if (isHorizontal) _isSwiping = true;
           _snapToClosest();
+        } else if (!_isDraggingSheet && isHorizontal) {
+          // Horizontal swipe started before sheet drag — lock out sheet drag
+          _isSwiping = true;
         } else if (_isDraggingSheet) {
           // Already in sheet-drag mode — keep driving the sheet
           widget.snappingSheetController.setSnappingSheetPosition(sheetPos - dy);
         } else if (atTop && isDraggingDown && !widget.isReordering.value) {
           // At top of scroll and pulling down — enter sheet-drag mode
-          debugPrint('[SHEET] drag started (down from top)');
           _isDraggingSheet = true;
           _dragStartSheetPos = sheetPos;
           if (widget.snappingSheetController.currentlySnapping) {
@@ -2027,7 +2036,6 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           }
         } else if (atTop && isDraggingUp && !widget.isReordering.value) {
           // At top of scroll and swiping up — enter sheet-drag mode
-          debugPrint('[SHEET] drag started (up from bottom)');
           _isDraggingSheet = true;
           _dragStartSheetPos = sheetPos;
           if (widget.snappingSheetController.currentlySnapping) {
@@ -2040,6 +2048,7 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           _isDraggingSheet = false;
           _snapToClosest();
         }
+        _isSwiping = false;
       },
       child: widget.child,
     );
