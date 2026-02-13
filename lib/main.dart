@@ -197,6 +197,7 @@ class _WheelDemoState extends State<WheelDemo> {
   final ScrollController _sheetScrollController = ScrollController();
   final ValueNotifier<bool> _isReordering = ValueNotifier(false);
   final ValueNotifier<double> _currentSheetHeight = ValueNotifier(0.0);
+  final SwipeGroupController _wheelSwipeController = SwipeGroupController();
   static const double _grabbingHeight = 30.0;
   static const double _bottomControlsHeight = 60.0;
 
@@ -370,6 +371,7 @@ class _WheelDemoState extends State<WheelDemo> {
             onReorderWheels: _reorderSavedWheels,
             onCreateNewWheel: _createNewWheel,
             buildWheelCard: _buildWheelCard,
+            swipeGroupController: _wheelSwipeController,
           );
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -1001,6 +1003,7 @@ class _WheelDemoState extends State<WheelDemo> {
                           child: Stack(
                             children: [
                               SwipeableActionCell(
+                                groupController: _wheelSwipeController,
                                 trailingActions: [
                                   SwipeableAction(
                                     color: const Color(0xFF38BDF8),
@@ -1251,6 +1254,9 @@ class _WheelDemoState extends State<WheelDemo> {
                 ],
                 onSheetMoved: (positionData) {
                   _currentSheetHeight.value = positionData.pixels;
+                  if (positionData.pixels <= 0) {
+                    _wheelSwipeController.closeAll();
+                  }
                 },
                 grabbingHeight: _grabbingHeight,
                 grabbing: _buildGrabbingHandle(),
@@ -1603,6 +1609,7 @@ class _WheelsScreen extends StatefulWidget {
   final Future<void> Function(int, int) onReorderWheels;
   final Future<void> Function() onCreateNewWheel;
   final Widget Function(WheelConfig wheel, bool isSelected, {VoidCallback? onTap}) buildWheelCard;
+  final SwipeGroupController swipeGroupController;
 
   const _WheelsScreen({
     required this.savedWheels,
@@ -1613,6 +1620,7 @@ class _WheelsScreen extends StatefulWidget {
     required this.onReorderWheels,
     required this.onCreateNewWheel,
     required this.buildWheelCard,
+    required this.swipeGroupController,
   });
 
   @override
@@ -1717,6 +1725,7 @@ class _WheelsScreenState extends State<_WheelsScreen> {
                             child: Stack(
                               children: [
                                 SwipeableActionCell(
+                                  groupController: widget.swipeGroupController,
                                   trailingActions: [
                                     SwipeableAction(
                                       color: const Color(0xFF38BDF8),
@@ -1965,8 +1974,9 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
 
   void _snapToClosest() {
     final current = widget.snappingSheetController.currentPosition;
-    // Content drag only snaps between bottom (-34) and mid (460) — upper snap is handle-only
-    final positions = <double>[-34, 460];
+    final upperSnap = widget.upperSnapHeight;
+    // Include upper snap if we started from there (so reorder conflict snaps back, not down)
+    final positions = _dragStartSheetPos > 461 ? <double>[-34, 460, upperSnap] : <double>[-34, 460];
     double bestDist = double.infinity;
     double bestPos = 460;
     final dragDelta = current - _dragStartSheetPos;
@@ -1979,9 +1989,13 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
     }
     // Bias toward the direction of the drag
     if (dragDelta < -80 && bestPos > -34) {
-      bestPos = -34;
-    } else if (dragDelta > 80 && bestPos < 460) {
-      bestPos = 460;
+      // Find nearest below
+      final below = positions.where((p) => p < _dragStartSheetPos).toList()..sort();
+      if (below.isNotEmpty) bestPos = below.last;
+    } else if (dragDelta > 80) {
+      // Find nearest above
+      final above = positions.where((p) => p > _dragStartSheetPos).toList()..sort();
+      if (above.isNotEmpty) bestPos = above.first;
     }
     widget.snappingSheetController.snapToPosition(
       SnappingPosition.pixels(
@@ -2022,8 +2036,9 @@ class _SheetScrollWrapperState extends State<_SheetScrollWrapper> {
           // Horizontal swipe started before sheet drag — lock out sheet drag
           _isSwiping = true;
         } else if (_isDraggingSheet) {
-          // Already in sheet-drag mode — keep driving the sheet (clamped to midsnap max)
-          final newPos = (sheetPos - dy).clamp(-34.0, 460.0);
+          // Already in sheet-drag mode — keep driving the sheet
+          final maxSnap = _dragStartSheetPos > 461 ? widget.upperSnapHeight : 460.0;
+          final newPos = (sheetPos - dy).clamp(-34.0, maxSnap);
           widget.snappingSheetController.setSnappingSheetPosition(newPos);
         } else if (atTop && isDraggingDown && !widget.isReordering.value) {
           // At top of scroll and pulling down — enter sheet-drag mode

@@ -103,7 +103,7 @@ class SpinningWheelState extends State<SpinningWheel>
     );
 
     _transitionController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 150),
       vsync: this,
     )..addListener(() {
       _wheelPainter.transition = _transitionController.value;

@@ -3,22 +3,26 @@ import 'color_utils.dart';
 
 class PushDownButton extends StatefulWidget {
   final Widget child;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Color color;
   final double borderRadius;
   final double height;
   final double bottomBorderWidth;
   final Color? bottomBorderColor;
+  final GestureLongPressStartCallback? onLongPressStart;
+  final GestureLongPressEndCallback? onLongPressEnd;
 
   const PushDownButton({
     super.key,
     required this.child,
-    required this.onTap,
+    this.onTap,
     required this.color,
     this.borderRadius = 21,
     this.height = 64,
     this.bottomBorderWidth = 6.5,
     this.bottomBorderColor,
+    this.onLongPressStart,
+    this.onLongPressEnd,
   });
 
   @override
@@ -46,7 +50,7 @@ class _PushDownButtonState extends State<PushDownButton>
 
   Future<void> _handleTap() async {
     await _controller.forward();
-    widget.onTap();
+    widget.onTap?.call();
     await _controller.reverse();
   }
 
@@ -63,7 +67,9 @@ class _PushDownButtonState extends State<PushDownButton>
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _handleTap,
+      onTap: widget.onTap != null ? _handleTap : null,
+      onLongPressStart: widget.onLongPressStart,
+      onLongPressEnd: widget.onLongPressEnd,
       child: SizedBox(
         height: widget.height,
         child: AnimatedBuilder(
@@ -119,6 +125,102 @@ class _PushDownButtonState extends State<PushDownButton>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A text field with an inset/sunken 3D appearance.
+class InsetTextField extends StatelessWidget {
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final String? hintText;
+  final TextStyle? style;
+  final TextStyle? hintStyle;
+  final ValueChanged<String>? onChanged;
+  final Color color;
+  final double borderRadius;
+  final double depth;
+
+  const InsetTextField({
+    super.key,
+    this.controller,
+    this.focusNode,
+    this.hintText,
+    this.style,
+    this.hintStyle,
+    this.onChanged,
+    this.color = const Color(0xFFF8F8F9),
+    this.borderRadius = 14,
+    this.depth = 2.5,
+  });
+
+  static const double _innerStrokeWidth = 2.5;
+
+  @override
+  Widget build(BuildContext context) {
+    final backColor = oklchShadow(color);
+    final innerStrokeColor = oklchShadow(color, lightnessReduction: 0.06);
+
+    return Stack(
+      children: [
+        // Back face — darker, full size (non-positioned, sets Stack size)
+        Padding(
+          padding: EdgeInsets.only(bottom: depth),
+          child: Container(
+            decoration: BoxDecoration(
+              color: backColor,
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              maxLines: 1,
+              style: const TextStyle(color: Colors.transparent, fontSize: 16),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: InputBorder.none,
+                hintText: hintText,
+                hintStyle: const TextStyle(color: Colors.transparent),
+              ),
+            ),
+          ),
+        ),
+        // Front face — offset from top by depth
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          top: depth,
+          child: Container(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(borderRadius),
+              border: Border.all(
+                color: innerStrokeColor,
+                width: _innerStrokeWidth,
+                strokeAlign: BorderSide.strokeAlignInside,
+              ),
+            ),
+          ),
+        ),
+        // Text field on top
+        Padding(
+          padding: EdgeInsets.only(top: depth),
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            maxLines: 1,
+            style: style,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              hintText: hintText,
+              hintStyle: hintStyle,
+              border: InputBorder.none,
+            ),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
     );
   }
 }

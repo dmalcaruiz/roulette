@@ -49,7 +49,7 @@ class WheelEditor extends StatefulWidget {
   State<WheelEditor> createState() => _WheelEditorState();
 }
 
-class _WheelEditorState extends State<WheelEditor> {
+class _WheelEditorState extends State<WheelEditor> with TickerProviderStateMixin {
   late TextEditingController _nameController;
   late List<_SegmentData> _segments;
   late double _textSize;
@@ -85,10 +85,19 @@ class _WheelEditorState extends State<WheelEditor> {
   late TextEditingController _strokeWidthController;
   late TextEditingController _centerMarkerSizeController;
   int _segmentIdCounter = 0;
+  late AnimationController _tabAnimController;
+  final SwipeGroupController _swipeGroupController = SwipeGroupController();
+  final Map<String, double> _animatingWeights = {};
+  final Set<String> _pendingRemoval = {};
 
   @override
   void initState() {
     super.initState();
+    _tabAnimController = AnimationController(
+      value: 0.0,
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
     if (widget.initialConfig != null) {
       _nameController = TextEditingController(text: widget.initialConfig!.name);
       _segments = widget.initialConfig!.items.map((item) {
@@ -184,6 +193,7 @@ class _WheelEditorState extends State<WheelEditor> {
     _cornerRadiusController.dispose();
     _strokeWidthController.dispose();
     _centerMarkerSizeController.dispose();
+    _tabAnimController.dispose();
     _keyRepeatTimer?.cancel();
     _previewDebounceTimer?.cancel();
     for (var controller in _weightControllers.values) {
@@ -195,6 +205,7 @@ class _WheelEditorState extends State<WheelEditor> {
     for (var node in _segmentFocusNodes.values) {
       node.dispose();
     }
+    _swipeGroupController.dispose();
     super.dispose();
   }
 
@@ -216,9 +227,9 @@ class _WheelEditorState extends State<WheelEditor> {
   }
 
   void _addSegment() {
+    final id = '${_segmentIdCounter++}';
+    final text = 'Option ${_segments.length + 1}';
     setState(() {
-      final id = '${_segmentIdCounter++}';
-      final text = 'Option ${_segments.length + 1}';
       _segments.add(_SegmentData(
         id: id,
         text: text,
@@ -228,7 +239,15 @@ class _WheelEditorState extends State<WheelEditor> {
       _weightControllers[id] = TextEditingController(text: '1.0');
       _segmentTextControllers[id] = TextEditingController(text: text);
     });
+    // Send preview with near-zero weight so wheel creates the segment tiny
+    _animatingWeights[id] = 0.01;
     _updatePreview(immediate: true);
+    // Next frame: remove override so wheel animates from 0.01 → real weight
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _animatingWeights.remove(id);
+      _updatePreview(immediate: true);
+    });
   }
 
   Color _getNextColor() {
@@ -249,20 +268,39 @@ class _WheelEditorState extends State<WheelEditor> {
   }
 
   void _removeSegment(int index) {
-    if (_segments.length > 2) {
+    final activeCount = _segments.where((s) => !_pendingRemoval.contains(s.id)).length;
+    if (activeCount > 2) {
+      final segment = _segments[index];
+      if (_pendingRemoval.contains(segment.id)) return;
+      // Mark as pending removal and collapse in editor list
+      _pendingRemoval.add(segment.id);
       setState(() {
-        final segment = _segments.removeAt(index);
-        _weightControllers[segment.id]?.dispose();
-        _weightControllers.remove(segment.id);
-        _segmentTextControllers[segment.id]?.dispose();
-        _segmentTextControllers.remove(segment.id);
-        _hexControllers[segment.id]?.dispose();
-        _hexControllers.remove(segment.id);
-        _segmentFocusNodes[segment.id]?.dispose();
-        _segmentFocusNodes.remove(segment.id);
         _expandedSegmentIndex = null;
       });
+      // Animate weight to near-zero on the wheel
+      _animatingWeights[segment.id] = 0.01;
       _updatePreview(immediate: true);
+      // After wheel transition completes, actually remove the segment
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (!mounted) return;
+        _pendingRemoval.remove(segment.id);
+        _animatingWeights.remove(segment.id);
+        setState(() {
+          final idx = _segments.indexWhere((s) => s.id == segment.id);
+          if (idx != -1) {
+            _segments.removeAt(idx);
+            _weightControllers[segment.id]?.dispose();
+            _weightControllers.remove(segment.id);
+            _segmentTextControllers[segment.id]?.dispose();
+            _segmentTextControllers.remove(segment.id);
+            _hexControllers[segment.id]?.dispose();
+            _hexControllers.remove(segment.id);
+            _segmentFocusNodes[segment.id]?.dispose();
+            _segmentFocusNodes.remove(segment.id);
+          }
+        });
+        _updatePreview(immediate: true);
+      });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Wheel must have at least 2 segments')),
@@ -447,7 +485,7 @@ class _WheelEditorState extends State<WheelEditor> {
       items: _segments.map((seg) => WheelItem(
         text: seg.text,
         color: seg.color,
-        weight: seg.weight,
+        weight: _animatingWeights[seg.id] ?? seg.weight,
         imagePath: seg.imagePath,
         iconName: seg.iconName,
       )).toList(),
@@ -538,59 +576,111 @@ class _WheelEditorState extends State<WheelEditor> {
     );
   }
 
+  void _switchTab(int index) {
+    if (index == _selectedTabIndex) return;
+    setState(() => _selectedTabIndex = index);
+    if (index == 1) {
+      _tabAnimController.animateTo(1.0, curve: Curves.easeOutBack);
+    } else {
+      _tabAnimController.animateTo(0.0, curve: Curves.easeOutBack);
+    }
+  }
+
   Widget _buildTabBar() {
     const borderRadius = 16.0;
+    const height = 48.0;
     final backColor = const Color(0xFFE4E4E7);
     final activeColor = Colors.white;
     final activeStroke = const Color(0xFFD4D4D8);
+    const labels = ['Segments', 'Style'];
+    final icons = [LucideIcons.layoutList, LucideIcons.paintbrush];
+    const inactiveColor = Color(0xFF1E1E2C);
 
     return Container(
-      height: 48,
+      height: height,
+      clipBehavior: Clip.none,
       decoration: BoxDecoration(
         color: backColor,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
       padding: const EdgeInsets.all(4),
-      child: Row(
-        children: List.generate(2, (index) {
-          final isActive = _selectedTabIndex == index;
-          final label = index == 0 ? 'Segments' : 'Style';
-          final icon = index == 0 ? LucideIcons.layoutList : LucideIcons.paintbrush;
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = constraints.maxWidth / 2;
+          final pillHeight = constraints.maxHeight;
 
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTabIndex = index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isActive ? activeColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(borderRadius - 2),
-                  border: isActive ? Border.all(color: activeStroke, width: 1.5) : null,
-                  boxShadow: isActive
-                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4, offset: const Offset(0, 2))]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 16, color: isActive ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.4)),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isActive ? const Color(0xFF1E1E2C) : const Color(0xFF1E1E2C).withValues(alpha: 0.4),
+          return AnimatedBuilder(
+            animation: _tabAnimController,
+            builder: (context, _) {
+              final t = _tabAnimController.value;
+              final pillX = t * tabWidth;
+
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Sliding pill
+                  Positioned(
+                    left: pillX,
+                    top: 0,
+                    width: tabWidth,
+                    height: pillHeight,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: activeColor,
+                        borderRadius: BorderRadius.circular(borderRadius - 2),
+                        border: Border.all(color: activeStroke, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+                  // Tab labels
+                  Row(
+                    children: List.generate(2, (index) {
+                      // 0.0 when this tab is inactive, 1.0 when active
+                      final activeT = index == 0 ? 1.0 - t : t;
+                      final color = Color.lerp(
+                        inactiveColor.withValues(alpha: 0.4),
+                        inactiveColor,
+                        activeT,
+                      )!;
+
+                      return Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _switchTab(index),
+                          child: SizedBox(
+                            height: pillHeight,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(icons[index], size: 16, color: color),
+                                const SizedBox(width: 6),
+                                Text(
+                                  labels[index],
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              );
+            },
           );
-        }),
+        },
       ),
     );
   }
@@ -792,46 +882,55 @@ class _WheelEditorState extends State<WheelEditor> {
                             Expanded(
                               child: IgnorePointer(
                                 ignoring: !isExpanded,
-                                child: TextField(
-                                  controller: _segmentTextControllers[segment.id],
-                                  focusNode: _segmentFocusNodes.putIfAbsent(segment.id, () => FocusNode()),
-                                  maxLines: 1,
-                                  cursorColor: isExpanded ? null : Colors.transparent,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                    color: isExpanded ? const Color(0xFF1E1E2C) : Colors.white,
-                                  ),
-                                  decoration: InputDecoration(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    hintText: 'Segment name',
-                                    hintStyle: TextStyle(
-                                      color: isExpanded
-                                          ? const Color(0xFF1E1E2C).withValues(alpha: 0.35)
-                                          : Colors.white.withValues(alpha: 0.6),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: isExpanded ? const Color(0xFFD4D4D8) : Colors.transparent,
-                                        width: 1.5,
+                                child: isExpanded
+                                  ? InsetTextField(
+                                      controller: _segmentTextControllers[segment.id],
+                                      focusNode: _segmentFocusNodes.putIfAbsent(segment.id, () => FocusNode()),
+                                      hintText: 'Segment name',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Color(0xFF1E1E2C),
                                       ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: isExpanded ? const Color(0xFF38BDF8) : Colors.transparent,
-                                        width: 2,
+                                      hintStyle: TextStyle(
+                                        color: const Color(0xFF1E1E2C).withValues(alpha: 0.35),
                                       ),
+                                      onChanged: (value) {
+                                        segment.text = value;
+                                        _updatePreview();
+                                      },
+                                    )
+                                  : TextField(
+                                      controller: _segmentTextControllers[segment.id],
+                                      focusNode: _segmentFocusNodes.putIfAbsent(segment.id, () => FocusNode()),
+                                      maxLines: 1,
+                                      cursorColor: Colors.transparent,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                        color: Colors.white,
+                                      ),
+                                      decoration: InputDecoration(
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        hintText: 'Segment name',
+                                        hintStyle: TextStyle(
+                                          color: Colors.white.withValues(alpha: 0.6),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        filled: false,
+                                      ),
+                                      onChanged: (value) {
+                                        segment.text = value;
+                                        _updatePreview();
+                                      },
                                     ),
-                                    filled: true,
-                                    fillColor: isExpanded ? const Color(0xFFF8F8F9) : Colors.transparent,
-                                  ),
-                                  onChanged: (value) {
-                                    segment.text = value;
-                                    _updatePreview();
-                                  },
-                                ),
                               ),
                             ),
                             // Chevron
@@ -868,36 +967,37 @@ class _WheelEditorState extends State<WheelEditor> {
                                     Row(
                                       children: [
                                         // Minus button
-                                        GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              segment.weight = (segment.weight - 0.1).clamp(0.1, 10.0);
-                                              _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                            });
-                                            _updatePreview();
-                                          },
-                                          onLongPressStart: (_) {
-                                            _startKeyRepeat(() {
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: SizedBox(
+                                            width: 36,
+                                            child: PushDownButton(
+                                            color: const Color(0xFFF4F4F5),
+                                            borderRadius: 10,
+                                            height: 36,
+                                            bottomBorderWidth: 3,
+                                            onTap: () {
                                               setState(() {
                                                 segment.weight = (segment.weight - 0.1).clamp(0.1, 10.0);
                                                 _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
                                               });
                                               _updatePreview();
-                                            });
-                                          },
-                                          onLongPressEnd: (_) => _stopKeyRepeat(),
-                                          child: Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF4F4F5),
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
-                                            ),
-                                            child: Icon(LucideIcons.minus, size: 20, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5)),
+                                            },
+                                            onLongPressStart: (_) {
+                                              _startKeyRepeat(() {
+                                                setState(() {
+                                                  segment.weight = (segment.weight - 0.1).clamp(0.1, 10.0);
+                                                  _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                                });
+                                                _updatePreview();
+                                              });
+                                            },
+                                            onLongPressEnd: (_) => _stopKeyRepeat(),
+                                            child: Icon(LucideIcons.minus, size: 30, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5)),
+                                          ),
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
+                                        const SizedBox(width: 4),
                                         // Weight label + value + slider
                                         Expanded(
                                           child: Column(
@@ -939,35 +1039,36 @@ class _WheelEditorState extends State<WheelEditor> {
                                             ],
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
+                                        const SizedBox(width: 4),
                                         // Plus button
-                                        GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              segment.weight = (segment.weight + 0.1).clamp(0.1, 10.0);
-                                              _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                            });
-                                            _updatePreview();
-                                          },
-                                          onLongPressStart: (_) {
-                                            _startKeyRepeat(() {
-                                              setState(() {
-                                                segment.weight = (segment.weight + 0.1).clamp(0.1, 10.0);
-                                                _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
-                                              });
-                                              _updatePreview();
-                                            });
-                                          },
-                                          onLongPressEnd: (_) => _stopKeyRepeat(),
-                                          child: Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: SizedBox(
+                                            width: 36,
+                                            child: PushDownButton(
                                               color: const Color(0xFFF4F4F5),
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: const Color(0xFFE4E4E7), width: 1.5),
+                                              borderRadius: 10,
+                                              height: 36,
+                                              bottomBorderWidth: 3,
+                                              onTap: () {
+                                                setState(() {
+                                                  segment.weight = (segment.weight + 0.1).clamp(0.1, 10.0);
+                                                  _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                                });
+                                                _updatePreview();
+                                              },
+                                              onLongPressStart: (_) {
+                                                _startKeyRepeat(() {
+                                                  setState(() {
+                                                    segment.weight = (segment.weight + 0.1).clamp(0.1, 10.0);
+                                                    _weightControllers[segment.id]?.text = segment.weight.toStringAsFixed(1);
+                                                  });
+                                                  _updatePreview();
+                                                });
+                                              },
+                                              onLongPressEnd: (_) => _stopKeyRepeat(),
+                                              child: Icon(LucideIcons.plus, size: 30, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5)),
                                             ),
-                                            child: Icon(LucideIcons.plus, size: 20, color: const Color(0xFF1E1E2C).withValues(alpha: 0.5)),
                                           ),
                                         ),
                                       ],
@@ -1066,6 +1167,7 @@ class _WheelEditorState extends State<WheelEditor> {
                 );
 
                 final swipeableCard = SwipeableActionCell(
+                  groupController: _swipeGroupController,
                   trailingActions: [
                     SwipeableAction(
                       color: const Color(0xFF38BDF8),

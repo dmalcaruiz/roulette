@@ -20,6 +20,30 @@ class SwipeableAction {
   });
 }
 
+/// Controller that ensures only one swipeable cell is open at a time.
+class SwipeGroupController extends ChangeNotifier {
+  _SwipeableActionCellState? _openCell;
+
+  void _onCellOpened(_SwipeableActionCellState cell) {
+    if (_openCell != null && _openCell != cell && _openCell!.mounted) {
+      _openCell!.close();
+    }
+    _openCell = cell;
+  }
+
+  void _onCellClosed(_SwipeableActionCellState cell) {
+    if (_openCell == cell) _openCell = null;
+  }
+
+  /// Close the currently open cell (if any).
+  void closeAll() {
+    if (_openCell != null && _openCell!.mounted) {
+      _openCell!.close();
+    }
+    _openCell = null;
+  }
+}
+
 /// Custom swipeable cell with full control over actions and animations
 class SwipeableActionCell extends StatefulWidget {
   final Widget child;
@@ -27,6 +51,7 @@ class SwipeableActionCell extends StatefulWidget {
   final List<SwipeableAction> trailingActions;
   final double fullSwipeThreshold;
   final double snapPositionPixels;
+  final SwipeGroupController? groupController;
 
   const SwipeableActionCell({
     super.key,
@@ -35,6 +60,7 @@ class SwipeableActionCell extends StatefulWidget {
     this.trailingActions = const [],
     this.fullSwipeThreshold = 0.55,
     this.snapPositionPixels = 120.0,
+    this.groupController,
   });
 
   @override
@@ -51,6 +77,13 @@ class _SwipeableActionCellState extends State<SwipeableActionCell>
   bool _isLocked = false;
   bool _wasExpanded = false;
   DateTime? _expansionStartTime;
+
+  /// Animate this cell back to closed.
+  void close() {
+    if (!mounted || _isCommitting) return;
+    _animateToOffset(0);
+    widget.groupController?._onCellClosed(this);
+  }
 
   @override
   void initState() {
@@ -157,9 +190,11 @@ class _SwipeableActionCellState extends State<SwipeableActionCell>
       // Snap to reveal actions at calculated pixel position
       final targetSnap = _dragOffset > 0 ? snapPosition : -snapPosition;
       _animateToOffset(targetSnap);
+      widget.groupController?._onCellOpened(this);
     } else {
       // Spring back to center
       _animateToOffset(0);
+      widget.groupController?._onCellClosed(this);
     }
   }
 
