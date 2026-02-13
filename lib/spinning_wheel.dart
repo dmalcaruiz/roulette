@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -57,13 +58,13 @@ class SpinningWheelState extends State<SpinningWheel>
   late Animation<double> _overlayAnimation;
   final List<AudioPlayer> _audioPool = [];
   int _currentAudioIndex = 0;
-  static const int _poolSize = 300; // Increased pool size for intense spinning
+  static const int _poolSize = 8;
   bool _isSpinning = false;
   bool get isSpinning => _isSpinning;
   bool _isResetting = false;
   bool _isPullingBack = false;
   double _currentRotation = 0;
-  String _currentSegment = '';
+  final ValueNotifier<String> _currentSegmentNotifier = ValueNotifier('');
   final List<Timer> _scheduledSounds = [];
   final Map<String, ui.Image> _imageCache = {};
   Timer? _imageRetryTimer;
@@ -71,6 +72,7 @@ class SpinningWheelState extends State<SpinningWheel>
   double _overlayOpacity = 0.0;
   late AnimationController _loadingController;
   double _loadingAngle = 0.0;
+  late final Listenable _repaintNotifier;
 
   @override
   void initState() {
@@ -82,9 +84,7 @@ class SpinningWheelState extends State<SpinningWheel>
       vsync: this,
     );
     _loadingController.addListener(() {
-      setState(() {
-        _loadingAngle = _loadingController.value * 2 * pi;
-      });
+      _loadingAngle = _loadingController.value * 2 * pi;
     });
 
     _startImageLoading();
@@ -107,26 +107,24 @@ class SpinningWheelState extends State<SpinningWheel>
       curve: Curves.easeInOut,
     ));
 
+    _repaintNotifier = Listenable.merge([_controller, _overlayController, _loadingController]);
+
     _controller.addListener(() {
-      setState(() {
-        _currentRotation = _animation.value;
-        _updateCurrentSegment();
-      });
+      _currentRotation = _animation.value;
+      _updateCurrentSegment();
     });
 
     _overlayController.addListener(() {
-      setState(() {
-        _overlayOpacity = _overlayAnimation.value;
-      });
+      _overlayOpacity = _overlayAnimation.value;
     });
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed && !_isResetting && !_isPullingBack) {
+        final winningIndex = _getWinningIndex();
         setState(() {
           _isSpinning = false;
+          _winningIndex = winningIndex;
         });
-        final winningIndex = _getWinningIndex();
-        _winningIndex = winningIndex;
 
         // Start overlay animation only if enabled (controls both dark overlay and winning segment as one layer)
         if (widget.showWinAnimation) {
@@ -159,7 +157,10 @@ class SpinningWheelState extends State<SpinningWheel>
     try {
       for (int i = 0; i < _poolSize; i++) {
         final player = AudioPlayer();
-        await player.setPlayerMode(PlayerMode.lowLatency);
+        if (!kIsWeb) {
+          await player.setPlayerMode(PlayerMode.lowLatency);
+        }
+        await player.setSource(AssetSource('audio/click.mp3'));
         _audioPool.add(player);
       }
     } catch (e) {
@@ -254,6 +255,7 @@ class SpinningWheelState extends State<SpinningWheel>
   @override
   void dispose() {
     _imageRetryTimer?.cancel();
+    _currentSegmentNotifier.dispose();
     _loadingController.dispose();
     _controller.dispose();
     _overlayController.dispose();
@@ -272,8 +274,12 @@ class SpinningWheelState extends State<SpinningWheel>
     try {
       final player = _audioPool[_currentAudioIndex];
       _currentAudioIndex = (_currentAudioIndex + 1) % _audioPool.length;
-      // play() handles all state management internally - no manual seek/resume needed
-      player.play(AssetSource('audio/click.mp3')).catchError((_) {});
+      player.seek(Duration.zero).then((_) {
+        player.resume().catchError((_) {});
+      }).catchError((_) {
+        // Fallback: full play call
+        player.play(AssetSource('audio/click.mp3')).catchError((_) {});
+      });
     } catch (e) {
       // Ignore audio errors
     }
@@ -290,7 +296,7 @@ class SpinningWheelState extends State<SpinningWheel>
       final segmentEnd = (accumulatedWeight / totalWeight) * 2 * pi;
 
       if (currentAngle <= segmentEnd) {
-        _currentSegment = item.text;
+        _currentSegmentNotifier.value = item.text;
         break;
       }
     }
@@ -405,8 +411,8 @@ class SpinningWheelState extends State<SpinningWheel>
 
     // If we're already at the closest point, just update the display
     if ((currentRotation - closestRotation).abs() < 0.01) {
+      _currentSegmentNotifier.value = '';
       setState(() {
-        _currentSegment = '';
         _isResetting = false;
       });
       return;
@@ -427,6 +433,9 @@ class SpinningWheelState extends State<SpinningWheel>
 
   void spin() {
     if (_isSpinning) return;
+
+    // Play a click immediately in user-gesture context to unlock audio on iOS Safari
+    _playClickSoundFromPool();
 
     setState(() {
       _isSpinning = true;
@@ -569,13 +578,18 @@ class SpinningWheelState extends State<SpinningWheel>
           opacity: widget.headerOpacity,
           child: SizedBox(
             height: (56 * widget.headerTextSizeMultiplier + 16) * widget.headerOpacity,
-            child: Text(
-              _currentSegment,
-              style: TextStyle(
-                fontSize: 56 * widget.headerTextSizeMultiplier,
-                fontWeight: FontWeight.w700,
-                color: widget.headerTextColor,
-              ),
+            child: ValueListenableBuilder<String>(
+              valueListenable: _currentSegmentNotifier,
+              builder: (context, segment, _) {
+                return Text(
+                  segment,
+                  style: TextStyle(
+                    fontSize: 56 * widget.headerTextSizeMultiplier,
+                    fontWeight: FontWeight.w700,
+                    color: widget.headerTextColor,
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -589,26 +603,31 @@ class SpinningWheelState extends State<SpinningWheel>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: spin,
-                child: CustomPaint(
-                  painter: WheelPainter(
-                    items: widget.items,
-                    rotation: _currentRotation,
-                    textStyle: TextStyle(
-                      color: Colors.white,
-                      fontSize: (widget.items.length >= 16 ? 24 : fontSize) * widget.textSizeMultiplier,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    cornerRadius: widget.cornerRadius,
-                    strokeWidth: widget.strokeWidth,
-                    showBackgroundCircle: widget.showBackgroundCircle,
-                    imageSize: widget.imageSize,
-                    imageCache: Map.unmodifiable(_imageCache),
-                    overlayOpacity: _overlayOpacity,
-                    winningIndex: _winningIndex,
-                    overlayColor: widget.overlayColor,
-                    textVerticalOffset: widget.size / 700 * 2, // 2px at 700px, scales proportionally
-                    loadingAngle: _loadingAngle,
-                  ),
+                child: ListenableBuilder(
+                  listenable: _repaintNotifier,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      painter: WheelPainter(
+                        items: widget.items,
+                        rotation: _currentRotation,
+                        textStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: (widget.items.length >= 16 ? 24 : fontSize) * widget.textSizeMultiplier,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        cornerRadius: widget.cornerRadius,
+                        strokeWidth: widget.strokeWidth,
+                        showBackgroundCircle: widget.showBackgroundCircle,
+                        imageSize: widget.imageSize,
+                        imageCache: _imageCache,
+                        overlayOpacity: _overlayOpacity,
+                        winningIndex: _winningIndex,
+                        overlayColor: widget.overlayColor,
+                        textVerticalOffset: widget.size / 700 * 2,
+                        loadingAngle: _loadingAngle,
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
