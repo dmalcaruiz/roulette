@@ -184,7 +184,7 @@ class WheelDemo extends StatefulWidget {
 
 class _WheelDemoState extends State<WheelDemo> {
   Color _backgroundColor = Colors.black;
-  Color _textColor = Colors.black;
+  Color _textColor = Colors.white;
   Color _overlayColor = Colors.black;
   final WheelManager _wheelManager = WheelManager();
   List<WheelConfig> _savedWheels = [];

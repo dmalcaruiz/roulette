@@ -42,7 +42,7 @@ class SpinningWheel extends StatefulWidget {
     this.centerMarkerSize = 200.0,
     this.spinIntensity = 0.5,
     this.isRandomIntensity = true,
-    this.headerTextColor = Colors.black,
+    this.headerTextColor = Colors.white,
     this.overlayColor = Colors.black,
     this.showWinAnimation = true,
     this.headerOpacity = 1.0,
@@ -118,6 +118,9 @@ class SpinningWheelState extends State<SpinningWheel>
 
     // 4. Start image loading
     _startImageLoading();
+
+    // 4b. Set initial segment header based on current rotation (0)
+    _updateCurrentSegment();
 
     // 5. Set up listeners that update painter's mutable fields directly
     _loadingController.addListener(() {
