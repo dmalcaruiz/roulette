@@ -732,8 +732,6 @@ class _WheelDemoState extends State<WheelDemo> {
                   child: PushDownButton(
                     color: const Color(0xFFF4F4F5),
                     onTap: () => Navigator.pop(context, false),
-                    height: 56,
-                    bottomBorderColor: const Color(0xFFD4D4D8),
                     child: const Center(
                       child: Text('Cancel', style: TextStyle(color: Color(0xFF1E1E2C), fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
@@ -744,8 +742,6 @@ class _WheelDemoState extends State<WheelDemo> {
                   child: PushDownButton(
                     color: const Color(0xFFEF4444),
                     onTap: () => Navigator.pop(context, true),
-                    height: 56,
-                    bottomBorderColor: const Color(0xFFDC2626),
                     child: const Center(
                       child: Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
@@ -1051,8 +1047,6 @@ class _WheelDemoState extends State<WheelDemo> {
     return PushDownButton(
       color: color,
       onTap: onTap,
-      height: 58,
-      bottomBorderColor: const Color(0xFF0EA5E9),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 22),
         child: Row(
@@ -1145,14 +1139,12 @@ class _WheelDemoState extends State<WheelDemo> {
                   Positioned(
                     left: 16,
                     right: 16,
-                    bottom: 10,
+                    bottom: 16,
                   child: Row(
                     children: [
                       PushDownButton(
                         color: const Color(0xFFAE01CB),
                         onTap: () => _wheelKey.currentState?.reset(),
-                        height: 64,
-                        bottomBorderColor: const Color(0xFF8A009F),
                         child: const SizedBox(
                           width: 59,
                           child: Center(
@@ -1165,9 +1157,7 @@ class _WheelDemoState extends State<WheelDemo> {
                         child: PushDownButton(
                           color: const Color(0xFF38BDF8),
                           onTap: () => _wheelKey.currentState?.spin(),
-                          height: 64,
-                          bottomBorderColor: const Color(0xFF0EA5E9),
-                          child: const Center(
+                                              child: const Center(
                             child: Text(
                               'SPIN',
                               style: TextStyle(
@@ -1189,8 +1179,6 @@ class _WheelDemoState extends State<WheelDemo> {
                             const SnappingPosition.pixels(positionPixels: 460),
                           );
                         },
-                        height: 64,
-                        bottomBorderColor: Colors.black,
                         child: const SizedBox(
                           width: 59,
                           child: Center(
@@ -1463,9 +1451,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                 PushDownButton(
                                   color: const Color(0xFFAE01CB),
                                   onTap: () => _wheelKey.currentState?.reset(),
-                                  height: 64,
-                                  bottomBorderColor: const Color(0xFF8A009F),
-                                  child: const SizedBox(
+                                            child: const SizedBox(
                                     width: 59,
                                     child: Center(
                                       child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
@@ -1477,9 +1463,7 @@ class _WheelDemoState extends State<WheelDemo> {
                                   child: PushDownButton(
                                     color: const Color(0xFF38BDF8),
                                     onTap: () => _wheelKey.currentState?.spin(),
-                                    height: 64,
-                                    bottomBorderColor: const Color(0xFF0EA5E9),
-                                    child: const Center(
+                                                                  child: const Center(
                                       child: Text(
                                         'SPIN',
                                         style: TextStyle(
@@ -1496,8 +1480,6 @@ class _WheelDemoState extends State<WheelDemo> {
                                 PushDownButton(
                                   color: const Color(0xFF1E1E2C),
                                   onTap: _openGearMenu,
-                                  height: 64,
-                                  bottomBorderColor: Colors.black,
                                   child: const SizedBox(
                                     width: 59,
                                     child: Center(
@@ -1730,8 +1712,6 @@ class _WheelsScreenState extends State<_WheelsScreen> {
                         widget.onReorderModeChanged(false);
                         setState(() => _isReorderMode = false);
                       },
-                      height: 58,
-                      bottomBorderColor: Colors.black,
                       child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 22),
                         child: Row(
@@ -1750,9 +1730,7 @@ class _WheelsScreenState extends State<_WheelsScreen> {
                         widget.onCreateNewWheel();
                         Navigator.pop(context);
                       },
-                      height: 58,
-                      bottomBorderColor: const Color(0xFF0EA5E9),
-                      child: const Padding(
+                                      child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 22),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,

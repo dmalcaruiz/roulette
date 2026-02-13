@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'push_down_button.dart';
 
 /// Action definition for swipeable cell
 class SwipeableAction {
@@ -97,7 +98,7 @@ class _SwipeableActionCellState extends State<SwipeableActionCell>
 
     // Calculate snap position based on number of actions (each button is 60px + 8px margin = 68px)
     final actions = _dragOffset > 0 ? widget.leadingActions : widget.trailingActions;
-    final snapPosition = actions.length * 68.0;
+    final snapPosition = actions.length * 68.0 + 12.0;
     final snapThreshold = snapPosition * 0.5; // Half of snap position for threshold
 
     // Check if we should trigger full-swipe action
@@ -302,11 +303,6 @@ class _SwipeableActionCellState extends State<SwipeableActionCell>
               duration: animationDuration,
               width: shouldExpand ? absOffset - 8 : 60,
               height: double.infinity,
-              decoration: BoxDecoration(
-                color: action.color,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
               margin: shouldExpand
                 ? EdgeInsets.only(
                     top: 4.0,
@@ -320,10 +316,13 @@ class _SwipeableActionCellState extends State<SwipeableActionCell>
                     top: 4.0,
                     bottom: 4.0,
                   ),
-              child: Icon(
-                action.icon,
-                color: action.iconColor ?? Colors.white,
-                size: 24,
+              child: SunkenPushDownButton(
+                color: action.color,
+                child: Icon(
+                  action.icon,
+                  color: action.iconColor ?? Colors.white,
+                  size: 24,
+                ),
               ),
             ),
           );

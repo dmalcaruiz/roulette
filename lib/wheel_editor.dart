@@ -9,6 +9,7 @@ import 'wheel_item.dart';
 import 'icon_map.dart';
 import 'push_down_button.dart';
 import 'swipeable_action_cell.dart';
+import 'color_utils.dart';
 
 String _colorToHex(Color c) {
   return '${c.red.toRadixString(16).padLeft(2, '0')}'
@@ -519,7 +520,7 @@ class _WheelEditorState extends State<WheelEditor> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -527,7 +528,7 @@ class _WheelEditorState extends State<WheelEditor> {
             children: [
               Expanded(
                 child: Text(
-                  widget.initialConfig != null ? 'Edit Wheel' : 'Create Wheel',
+                  widget.initialConfig != null ? 'Edit Wheel' : 'Edit Wheel',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -546,7 +547,7 @@ class _WheelEditorState extends State<WheelEditor> {
                 ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 13),
           TextField(
             controller: _nameController,
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
@@ -604,23 +605,14 @@ class _WheelEditorState extends State<WheelEditor> {
                       }
                     });
                   },
-                  child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  decoration: BoxDecoration(
-                    color: isExpanded ? Colors.white : segment.color,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isExpanded ? segment.color : Colors.transparent,
-                      width: 3,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
+                  child: _SegmentCard3D(
+                  color: isExpanded ? Colors.white : segment.color,
+                  expandedBorderColor: isExpanded ? segment.color : null,
                   child: Column(
                     children: [
                       // ── Collapsed row (always visible) ──
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         child: IntrinsicHeight(
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -656,7 +648,7 @@ class _WheelEditorState extends State<WheelEditor> {
                                     color: isExpanded ? const Color(0xFF1E1E2C) : Colors.white,
                                   ),
                                   decoration: InputDecoration(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                     hintText: 'Segment name',
                                     hintStyle: TextStyle(
                                       color: isExpanded
@@ -951,7 +943,7 @@ class _WheelEditorState extends State<WheelEditor> {
             icon: LucideIcons.plus,
             label: 'Add Segment',
             onTap: _addSegment,
-            color: const Color(0xFF38BDF8),
+            color: const Color(0xFF1E1E2C),
             textColor: Colors.white,
           ),
           const SizedBox(height: 32),
@@ -1000,8 +992,6 @@ class _WheelEditorState extends State<WheelEditor> {
     return PushDownButton(
       color: color,
       onTap: onTap,
-      height: 56,
-      bottomBorderColor: const Color(0xFF0EA5E9),
       child: child,
     );
   }
@@ -1240,8 +1230,6 @@ class _VisualConfigSheetState extends State<_VisualConfigSheet>
     return PushDownButton(
       color: color,
       onTap: onTap,
-      height: 56,
-      bottomBorderColor: borderColor ?? Colors.black.withValues(alpha: 0.2),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
@@ -1253,6 +1241,79 @@ class _VisualConfigSheetState extends State<_VisualConfigSheet>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SegmentCard3D extends StatelessWidget {
+  final Color color;
+  final Color? expandedBorderColor;
+  final Widget child;
+
+  static const double _bottomDepth = 6.5;
+  static const double _outerStrokeWidth = 3.5;
+  static const double _innerStrokeWidth = 2.5;
+  static const double _borderRadius = 21;
+
+  const _SegmentCard3D({
+    required this.color,
+    this.expandedBorderColor,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shadowSource = expandedBorderColor ?? color;
+    final bottomColor = oklchShadow(shadowSource);
+    final outerStrokeColor = bottomColor.withValues(alpha: 0.25);
+    final innerStrokeColor = oklchShadow(color, lightnessReduction: 0.06);
+    final isExpanded = expandedBorderColor != null;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Bottom face — positioned behind, offset down by depth
+        Positioned(
+          left: 0,
+          right: 0,
+          top: _bottomDepth,
+          bottom: 0,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              color: bottomColor,
+              borderRadius: BorderRadius.circular(_borderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: outerStrokeColor,
+                  spreadRadius: _outerStrokeWidth,
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Top face — determines stack height, padded for depth
+        Padding(
+          padding: const EdgeInsets.only(bottom: _bottomDepth),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(_borderRadius),
+              border: Border.all(
+                color: isExpanded ? expandedBorderColor! : innerStrokeColor,
+                width: isExpanded ? 3 : _innerStrokeWidth,
+                strokeAlign: BorderSide.strokeAlignInside,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: child,
+          ),
+        ),
+      ],
     );
   }
 }
