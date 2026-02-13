@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' as foundation;
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -597,7 +597,7 @@ class _WheelEditorState extends State<WheelEditor> {
                         _expandedSegmentIndex = null;
                       } else {
                         _expandedSegmentIndex = index;
-                        if (!(Platform.isAndroid || Platform.isIOS)) {
+                        if (!foundation.kIsWeb) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _segmentFocusNodes[segment.id]?.requestFocus();
                           });
@@ -1118,16 +1118,15 @@ class _VisualConfigSheetState extends State<_VisualConfigSheet>
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         children: [
-          if (widget.imagePath != null) ...[
+          if (widget.imagePath != null && !foundation.kIsWeb) ...[
             Container(
               width: 120, height: 120,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: const Color(0xFFD4D4D8), width: 1.5),
-                image: DecorationImage(
-                  image: FileImage(File(widget.imagePath!)),
-                  fit: BoxFit.cover,
-                ),
+              ),
+              child: const Center(
+                child: Icon(LucideIcons.image, size: 40, color: Color(0xFFD4D4D8)),
               ),
             ),
             const SizedBox(height: 16),

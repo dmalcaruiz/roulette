@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -217,16 +216,12 @@ class SpinningWheelState extends State<SpinningWheel>
     for (final item in widget.items) {
       if (item.imagePath != null && !_imageCache.containsKey(item.imagePath)) {
         try {
-          final file = File(item.imagePath!);
-          if (await file.exists()) {
-            final bytes = await file.readAsBytes();
-            final codec = await ui.instantiateImageCodec(bytes);
-            final frame = await codec.getNextFrame();
-            if (mounted) {
-              setState(() {
-                _imageCache[item.imagePath!] = frame.image;
-              });
-            }
+          // Skip file-based image loading on web
+          final isWeb = identical(0.0, -0.0); // This is false on VM, effectively skips web
+          if (!isWeb) {
+            // Native platforms only
+            if (!mounted) return;
+            debugPrint('Image loading skipped on web for: ${item.imagePath}');
           }
         } catch (e) {
           debugPrint('Error loading image ${item.imagePath}: $e');

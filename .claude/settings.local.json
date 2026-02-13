@@ -8,7 +8,11 @@
       "Bash(git pull:*)",
       "Bash(dir:*)",
       "Bash(flutter build:*)",
-      "Bash(dart analyze:*)"
+      "Bash(dart analyze:*)",
+      "Bash(git add:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git hash-object:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
