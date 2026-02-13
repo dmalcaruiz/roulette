@@ -572,9 +572,12 @@ class _WheelEditorState extends State<WheelEditor> {
             buildDefaultDragHandles: false,
             itemCount: _segments.length,
             proxyDecorator: (child, index, animation) {
-              return Material(
-                color: Colors.transparent,
-                child: child,
+              return Transform.scale(
+                scale: 1.05,
+                child: Material(
+                  color: Colors.transparent,
+                  child: child,
+                ),
               );
             },
             onReorder: (oldIndex, newIndex) {
@@ -617,19 +620,16 @@ class _WheelEditorState extends State<WheelEditor> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Drag handle — stretches full row height
-                            ReorderableDragStartListener(
-                              index: index,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
-                                child: Center(
-                                  child: Icon(
-                                    LucideIcons.gripVertical,
-                                    size: 22,
-                                    color: isExpanded
-                                        ? const Color(0xFF1E1E2C).withValues(alpha: 0.3)
-                                        : Colors.white.withValues(alpha: 0.6),
-                                  ),
+                            // Drag handle icon (visual only — drag listener is stacked on top)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              child: Center(
+                                child: Icon(
+                                  LucideIcons.gripVertical,
+                                  size: 22,
+                                  color: isExpanded
+                                      ? const Color(0xFF1E1E2C).withValues(alpha: 0.3)
+                                      : Colors.white.withValues(alpha: 0.6),
                                 ),
                               ),
                             ),
@@ -930,7 +930,40 @@ class _WheelEditorState extends State<WheelEditor> {
                 return Padding(
                   key: ValueKey(segment.id),
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: swipeableCard,
+                  child: Stack(
+                    children: [
+                      swipeableCard,
+                      // Drag listener on top — covers full card height, 45px wide
+                      // Taps pass through to expand/collapse; drags trigger reorder
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 45,
+                        child: ReorderableDragStartListener(
+                          index: index,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              setState(() {
+                                if (isExpanded) {
+                                  _expandedSegmentIndex = null;
+                                } else {
+                                  _expandedSegmentIndex = index;
+                                  if (!foundation.kIsWeb) {
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      _segmentFocusNodes[segment.id]?.requestFocus();
+                                    });
+                                  }
+                                }
+                              });
+                            },
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               } catch (e) {
                 debugPrint('Segment render error: $e');
@@ -1263,6 +1296,7 @@ class _SegmentCard3D extends StatelessWidget {
   Widget build(BuildContext context) {
     final shadowSource = expandedBorderColor ?? color;
     final bottomColor = oklchShadow(shadowSource);
+    final bottomStrokeColor = oklchShadow(shadowSource, lightnessReduction: 0.16);
     final innerStrokeColor = oklchShadow(color, lightnessReduction: 0.06);
     final isExpanded = expandedBorderColor != null;
 
@@ -1281,6 +1315,11 @@ class _SegmentCard3D extends StatelessWidget {
             decoration: BoxDecoration(
               color: bottomColor,
               borderRadius: BorderRadius.circular(_borderRadius),
+              border: Border.all(
+                color: bottomStrokeColor,
+                width: _innerStrokeWidth,
+                strokeAlign: BorderSide.strokeAlignInside,
+              ),
             ),
           ),
         ),

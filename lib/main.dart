@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show min;
+import 'dart:math' show min, pi;
 import 'package:flutter/material.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -170,7 +170,7 @@ class WheelDemo extends StatefulWidget {
 }
 
 class _WheelDemoState extends State<WheelDemo> {
-  Color _backgroundColor = Colors.white;
+  Color _backgroundColor = Colors.black;
   Color _textColor = Colors.black;
   Color _overlayColor = Colors.black;
   final WheelManager _wheelManager = WheelManager();
@@ -188,7 +188,6 @@ class _WheelDemoState extends State<WheelDemo> {
   double _spinIntensity = 0.5;
   bool _isRandomIntensity = true;
   bool _showWinAnimation = true;
-  bool _isReorderMode = false;
   final GlobalKey<SpinningWheelState> _wheelKey = GlobalKey<SpinningWheelState>();
 
   // Snapping sheet controls (mobile)
@@ -355,7 +354,6 @@ class _WheelDemoState extends State<WheelDemo> {
           return _WheelsScreen(
             savedWheels: _savedWheels,
             currentWheel: _currentWheel,
-            isReorderMode: _isReorderMode,
             onWheelSelected: (wheel) {
               setState(() {
                 _currentWheel = wheel;
@@ -367,7 +365,6 @@ class _WheelDemoState extends State<WheelDemo> {
             onDeleteWheel: _deleteWheel,
             onReorderWheels: _reorderSavedWheels,
             onCreateNewWheel: _createNewWheel,
-            onReorderModeChanged: (v) => setState(() => _isReorderMode = v),
             buildWheelCard: _buildWheelCard,
           );
         },
@@ -642,7 +639,7 @@ class _WheelDemoState extends State<WheelDemo> {
     });
   }
 
-  Future<void> _duplicateWheel(WheelConfig wheel) async {
+  Future<WheelConfig?> _duplicateWheel(WheelConfig wheel) async {
     final duplicatedWheel = wheel.copyWith(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: '${wheel.name} (Copy)',
@@ -680,9 +677,11 @@ class _WheelDemoState extends State<WheelDemo> {
     setState(() {
       _currentWheel = duplicatedWheel;
     });
+
+    return duplicatedWheel;
   }
 
-  Future<void> _deleteWheel(WheelConfig wheel) async {
+  Future<bool> _deleteWheel(WheelConfig wheel) async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -763,7 +762,9 @@ class _WheelDemoState extends State<WheelDemo> {
           _currentWheel = _savedWheels.isNotEmpty ? _savedWheels.first : _presets.first;
         });
       }
+      return true;
     }
+    return false;
   }
 
   Future<void> _openWheelManager() async {
@@ -837,10 +838,12 @@ class _WheelDemoState extends State<WheelDemo> {
     );
   }
 
-  Widget _buildWheelCard(WheelConfig wheel, bool isSelected, {bool showDragHandle = false, VoidCallback? onTap}) {
+  Widget _buildWheelCard(WheelConfig wheel, bool isSelected, {VoidCallback? onTap}) {
     final faceColor = isSelected ? const Color(0xFFE0F2FE) : Colors.white;
     final borderColor = isSelected ? const Color(0xFF38BDF8) : const Color(0xFFD4D4D8);
-    final bottomColor = oklchShadow(isSelected ? borderColor : faceColor);
+    final shadowSource = isSelected ? borderColor : faceColor;
+    final bottomColor = oklchShadow(shadowSource);
+    final bottomStrokeColor = oklchShadow(shadowSource, lightnessReduction: 0.16);
     final innerStrokeColor = isSelected ? borderColor : oklchShadow(faceColor, lightnessReduction: 0.06);
     const double bottomDepth = 6.5;
     const double innerStrokeWidth = 2.5;
@@ -864,23 +867,30 @@ class _WheelDemoState extends State<WheelDemo> {
             right: 0,
             top: bottomDepth,
             bottom: 0,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               decoration: BoxDecoration(
                 color: bottomColor,
                 borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(
+                  color: bottomStrokeColor,
+                  width: innerStrokeWidth,
+                  strokeAlign: BorderSide.strokeAlignInside,
+                ),
               ),
             ),
           ),
           // Top face
           Padding(
             padding: const EdgeInsets.only(bottom: bottomDepth),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               decoration: BoxDecoration(
                 color: faceColor,
                 borderRadius: BorderRadius.circular(borderRadius),
                 border: Border.all(
                   color: innerStrokeColor,
-                  width: isSelected ? 3 : innerStrokeWidth,
+                  width: innerStrokeWidth,
                   strokeAlign: BorderSide.strokeAlignInside,
                 ),
               ),
@@ -895,19 +905,10 @@ class _WheelDemoState extends State<WheelDemo> {
                       size: 22,
                     ),
                   ),
-                  Container(
+                  SizedBox(
                     width: 40,
                     height: 40,
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFFF4F4F5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      LucideIcons.dices,
-                      color: isSelected ? Colors.white : const Color(0xFF1E1E2C),
-                      size: 22,
-                      weight: 5.5,
-                    ),
+                    child: _WheelThumbnail(items: wheel.items),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -964,15 +965,14 @@ class _WheelDemoState extends State<WheelDemo> {
                     ),
                   ),
                 )
-              : _isReorderMode
-                ? ReorderableListView.builder(
+              : ReorderableListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     buildDefaultDragHandles: false,
                     itemCount: _savedWheels.length,
                     proxyDecorator: (child, index, animation) {
                       return Transform.scale(
-                        scale: 1.1,
+                        scale: 1.05,
                         child: child,
                       );
                     },
@@ -984,56 +984,53 @@ class _WheelDemoState extends State<WheelDemo> {
                       }
                     },
                     itemBuilder: (context, index) {
-                      final wheel = _savedWheels[index];
-                      final isSelected = _currentWheel?.id == wheel.id;
-                      return ReorderableDelayedDragStartListener(
-                        key: ValueKey(wheel.id),
-                        index: index,
-                        child: Column(
-                          children: [
-                            _buildWheelCard(wheel, isSelected, showDragHandle: true),
-                            const SizedBox(height: 10),
-                          ],
-                        ),
-                      );
-                    },
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _savedWheels.length,
-                    itemBuilder: (context, index) {
                       try {
                         final wheel = _savedWheels[index];
                         final isSelected = _currentWheel?.id == wheel.id;
+                        final card = _buildWheelCard(wheel, isSelected);
                         return Padding(
+                          key: ValueKey(wheel.id),
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: SwipeableActionCell(
-                            key: ValueKey(wheel.id),
-                            // Swipe left to reveal copy + delete (trailing)
-                            trailingActions: [
-                              SwipeableAction(
-                                color: const Color(0xFF38BDF8),
-                                icon: LucideIcons.copy,
-                                onTap: () => _duplicateWheel(wheel),
+                          child: Stack(
+                            children: [
+                              SwipeableActionCell(
+                                trailingActions: [
+                                  SwipeableAction(
+                                    color: const Color(0xFF38BDF8),
+                                    icon: LucideIcons.copy,
+                                    onTap: () => _duplicateWheel(wheel),
+                                  ),
+                                  SwipeableAction(
+                                    color: const Color(0xFFEF4444),
+                                    icon: LucideIcons.trash2,
+                                    onTap: () => _deleteWheel(wheel),
+                                    expandOnFullSwipe: true,
+                                  ),
+                                ],
+                                child: card,
                               ),
-                              SwipeableAction(
-                                color: const Color(0xFFEF4444),
-                                icon: LucideIcons.trash2,
-                                onTap: () => _deleteWheel(wheel),
-                                expandOnFullSwipe: true,
+                              // Drag overlay — 45px wide, full height, on top
+                              Positioned(
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: 45,
+                                child: ReorderableDragStartListener(
+                                  index: index,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      setState(() {
+                                        _currentWheel = wheel;
+                                        _previewWheel = null;
+                                        _editingWheel = null;
+                                      });
+                                    },
+                                    child: const SizedBox.expand(),
+                                  ),
+                                ),
                               ),
                             ],
-                            // Swipe right to activate reorder mode (leading)
-                            leadingActions: [
-                              SwipeableAction(
-                                color: const Color(0xFF1E1E2C),
-                                icon: LucideIcons.gripVertical,
-                                onTap: () => setState(() => _isReorderMode = true),
-                                expandOnFullSwipe: true,
-                              ),
-                            ],
-                            child: _buildWheelCard(wheel, isSelected),
                           ),
                         );
                       } catch (e) {
@@ -1043,20 +1040,12 @@ class _WheelDemoState extends State<WheelDemo> {
                     },
                   ),
           const SizedBox(height: 10),
-          if (_isReorderMode)
-            _chunkyButton(
-              icon: LucideIcons.check,
-              label: 'Done Reordering',
-              onTap: () => setState(() => _isReorderMode = false),
-              color: const Color(0xFF1E1E2C),
-            )
-          else
-            _chunkyButton(
-              icon: LucideIcons.plus,
-              label: 'Create New Wheel',
-              onTap: _createNewWheel,
-              color: const Color(0xFF38BDF8),
-            ),
+          _chunkyButton(
+            icon: LucideIcons.plus,
+            label: 'Create New Wheel',
+            onTap: _createNewWheel,
+            color: const Color(0xFF38BDF8),
+          ),
         ],
       ),
     );
@@ -1159,64 +1148,76 @@ class _WheelDemoState extends State<WheelDemo> {
             color: _backgroundColor,
             child: Stack(
               children: [
-                // Fixed spin controls at screen bottom (behind wheel in z-order)
+                // Fixed spin controls at screen bottom
                 if (_previewWheel != null || _currentWheel != null)
                   Positioned(
-                    left: 32,
-                    right: 32,
-                    bottom: 16,
-                  child: Row(
-                    children: [
-                      PushDownButton(
-                        color: const Color(0xFFAE01CB),
-                        onTap: () => _wheelKey.currentState?.reset(),
-                        child: const SizedBox(
-                          width: 59,
-                          child: Center(
-                            child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
-                          ),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
+                        border: Border(
+                          top: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                          left: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
+                          right: BorderSide(color: Color(0xFFE4E4E7), width: 1.5),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: PushDownButton(
-                          color: const Color(0xFF38BDF8),
-                          onTap: () => _wheelKey.currentState?.spin(),
-                                              child: const Center(
-                            child: Text(
-                              'SPIN',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 2,
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                      child: Row(
+                        children: [
+                          PushDownButton(
+                            color: const Color(0xFFAE01CB),
+                            onTap: () => _wheelKey.currentState?.reset(),
+                            child: const SizedBox(
+                              width: 59,
+                              child: Center(
+                                child: Icon(LucideIcons.rotateCcw, color: Colors.white, size: 28),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      PushDownButton(
-                        color: const Color(0xFF1E1E2C),
-                        onTap: () {
-                          _openCurrentWheelEditor();
-                          _snappingSheetController.snapToPosition(
-                            const SnappingPosition.pixels(positionPixels: 460),
-                          );
-                        },
-                        child: const SizedBox(
-                          width: 59,
-                          child: Center(
-                            child: Icon(LucideIcons.pencil, color: Colors.white, size: 28),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: PushDownButton(
+                              color: const Color(0xFF38BDF8),
+                              onTap: () => _wheelKey.currentState?.spin(),
+                              child: const Center(
+                                child: Text(
+                                  'SPIN',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 10),
+                          PushDownButton(
+                            color: const Color(0xFF1E1E2C),
+                            onTap: () {
+                              _openCurrentWheelEditor();
+                              _snappingSheetController.snapToPosition(
+                                const SnappingPosition.pixels(positionPixels: 460),
+                              );
+                            },
+                            child: const SizedBox(
+                              width: 59,
+                              child: Center(
+                                child: Icon(LucideIcons.pencil, color: Colors.white, size: 28),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
               SnappingSheet(
                 controller: _snappingSheetController,
-                lockOverflowDrag: true,
+                lockOverflowDrag: false,
                 snappingPositions: [
                   const SnappingPosition.pixels(
                     positionPixels: -34,
@@ -1572,25 +1573,21 @@ class _WheelDemoState extends State<WheelDemo> {
 class _WheelsScreen extends StatefulWidget {
   final List<WheelConfig> savedWheels;
   final WheelConfig? currentWheel;
-  final bool isReorderMode;
   final ValueChanged<WheelConfig> onWheelSelected;
-  final Future<void> Function(WheelConfig) onDuplicateWheel;
-  final Future<void> Function(WheelConfig) onDeleteWheel;
+  final Future<WheelConfig?> Function(WheelConfig) onDuplicateWheel;
+  final Future<bool> Function(WheelConfig) onDeleteWheel;
   final Future<void> Function(int, int) onReorderWheels;
   final Future<void> Function() onCreateNewWheel;
-  final ValueChanged<bool> onReorderModeChanged;
-  final Widget Function(WheelConfig wheel, bool isSelected, {bool showDragHandle, VoidCallback? onTap}) buildWheelCard;
+  final Widget Function(WheelConfig wheel, bool isSelected, {VoidCallback? onTap}) buildWheelCard;
 
   const _WheelsScreen({
     required this.savedWheels,
     required this.currentWheel,
-    required this.isReorderMode,
     required this.onWheelSelected,
     required this.onDuplicateWheel,
     required this.onDeleteWheel,
     required this.onReorderWheels,
     required this.onCreateNewWheel,
-    required this.onReorderModeChanged,
     required this.buildWheelCard,
   });
 
@@ -1599,12 +1596,34 @@ class _WheelsScreen extends StatefulWidget {
 }
 
 class _WheelsScreenState extends State<_WheelsScreen> {
-  late bool _isReorderMode;
+  late List<WheelConfig> _wheels;
+  String? _selectedWheelId;
+  DateTime? _lastTapTime;
+  String? _lastTappedWheelId;
 
   @override
   void initState() {
     super.initState();
-    _isReorderMode = widget.isReorderMode;
+    _wheels = List.of(widget.savedWheels);
+    _selectedWheelId = widget.currentWheel?.id;
+  }
+
+  void _handleWheelTap(WheelConfig wheel) {
+    final now = DateTime.now();
+    final isDoubleTap = _lastTappedWheelId == wheel.id &&
+        _lastTapTime != null &&
+        now.difference(_lastTapTime!) < const Duration(milliseconds: 350);
+
+    if (isDoubleTap) {
+      widget.onWheelSelected(wheel);
+      Navigator.pop(context);
+    } else {
+      widget.onWheelSelected(wheel);
+      setState(() { _selectedWheelId = wheel.id; });
+    }
+
+    _lastTapTime = now;
+    _lastTappedWheelId = wheel.id;
   }
 
   @override
@@ -1631,7 +1650,7 @@ class _WheelsScreenState extends State<_WheelsScreen> {
             const SizedBox(height: 16),
             // Wheel list
             Expanded(
-              child: widget.savedWheels.isEmpty
+              child: _wheels.isEmpty
                   ? Center(
                       child: Text(
                         'No saved wheels yet.\nCreate your first wheel!',
@@ -1641,132 +1660,113 @@ class _WheelsScreenState extends State<_WheelsScreen> {
                         ),
                       ),
                     )
-                  : _isReorderMode
-                      ? ReorderableListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          buildDefaultDragHandles: false,
-                          itemCount: widget.savedWheels.length,
-                          proxyDecorator: (child, index, animation) {
-                            return Transform.scale(scale: 1.1, child: child);
-                          },
-                          onReorder: (oldIndex, newIndex) {
-                            try {
-                              widget.onReorderWheels(oldIndex, newIndex);
-                              setState(() {});
-                            } catch (e) {
-                              debugPrint('Reorder error: $e');
-                            }
-                          },
-                          itemBuilder: (context, index) {
-                            final wheel = widget.savedWheels[index];
-                            final isSelected = widget.currentWheel?.id == wheel.id;
-                            return ReorderableDelayedDragStartListener(
-                              key: ValueKey(wheel.id),
-                              index: index,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: widget.buildWheelCard(wheel, isSelected, showDragHandle: true, onTap: () {
-                                  widget.onWheelSelected(wheel);
-                                  Navigator.pop(context);
-                                }),
-                              ),
-                            );
-                          },
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: widget.savedWheels.length,
-                          itemBuilder: (context, index) {
-                            try {
-                              final wheel = widget.savedWheels[index];
-                              final isSelected = widget.currentWheel?.id == wheel.id;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: SwipeableActionCell(
-                                  key: ValueKey(wheel.id),
+                  : ReorderableListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      buildDefaultDragHandles: false,
+                      itemCount: _wheels.length,
+                      proxyDecorator: (child, index, animation) {
+                        return Transform.scale(scale: 1.05, child: child);
+                      },
+                      onReorder: (oldIndex, newIndex) {
+                        try {
+                          widget.onReorderWheels(oldIndex, newIndex);
+                          setState(() {
+                            if (newIndex > oldIndex) newIndex--;
+                            final item = _wheels.removeAt(oldIndex);
+                            _wheels.insert(newIndex, item);
+                          });
+                        } catch (e) {
+                          debugPrint('Reorder error: $e');
+                        }
+                      },
+                      itemBuilder: (context, index) {
+                        try {
+                          final wheel = _wheels[index];
+                          final isSelected = _selectedWheelId == wheel.id;
+                          final card = widget.buildWheelCard(wheel, isSelected,
+                            onTap: () => _handleWheelTap(wheel),
+                          );
+                          return Padding(
+                            key: ValueKey(wheel.id),
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Stack(
+                              children: [
+                                SwipeableActionCell(
                                   trailingActions: [
                                     SwipeableAction(
                                       color: const Color(0xFF38BDF8),
                                       icon: LucideIcons.copy,
-                                      onTap: () {
-                                        widget.onDuplicateWheel(wheel);
-                                        setState(() {});
+                                      onTap: () async {
+                                        final copy = await widget.onDuplicateWheel(wheel);
+                                        if (!mounted || copy == null) return;
+                                        final idx = _wheels.indexWhere((w) => w.id == wheel.id);
+                                        setState(() {
+                                          _wheels.insert(idx + 1, copy);
+                                          _selectedWheelId = copy.id;
+                                        });
                                       },
                                     ),
                                     SwipeableAction(
                                       color: const Color(0xFFEF4444),
                                       icon: LucideIcons.trash2,
-                                      onTap: () {
-                                        widget.onDeleteWheel(wheel);
-                                        setState(() {});
+                                      onTap: () async {
+                                        final deleted = await widget.onDeleteWheel(wheel);
+                                        if (!mounted || !deleted) return;
+                                        setState(() {
+                                          _wheels.removeWhere((w) => w.id == wheel.id);
+                                        });
                                       },
                                       expandOnFullSwipe: true,
                                     ),
                                   ],
-                                  leadingActions: [
-                                    SwipeableAction(
-                                      color: const Color(0xFF1E1E2C),
-                                      icon: LucideIcons.gripVertical,
-                                      onTap: () {
-                                        widget.onReorderModeChanged(true);
-                                        setState(() => _isReorderMode = true);
-                                      },
-                                      expandOnFullSwipe: true,
-                                    ),
-                                  ],
-                                  child: widget.buildWheelCard(wheel, isSelected, onTap: () {
-                                    widget.onWheelSelected(wheel);
-                                    Navigator.pop(context);
-                                  }),
+                                  child: card,
                                 ),
-                              );
-                            } catch (e) {
-                              debugPrint('Wheel item render error: $e');
-                              return Container(key: ValueKey('error_${widget.savedWheels[index].id}'));
-                            }
-                          },
-                        ),
+                                // Drag overlay — 45px wide, full height, on top
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: 45,
+                                  child: ReorderableDragStartListener(
+                                    index: index,
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () => _handleWheelTap(wheel),
+                                      child: const SizedBox.expand(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        } catch (e) {
+                          debugPrint('Wheel item render error: $e');
+                          return Container(key: ValueKey('error_${_wheels[index].id}'));
+                        }
+                      },
+                    ),
             ),
             // Bottom button
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-              child: _isReorderMode
-                  ? PushDownButton(
-                      color: const Color(0xFF1E1E2C),
-                      onTap: () {
-                        widget.onReorderModeChanged(false);
-                        setState(() => _isReorderMode = false);
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 22),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(LucideIcons.check, color: Colors.white, size: 22),
-                            SizedBox(width: 12),
-                            Text('Done Reordering', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                          ],
-                        ),
-                      ),
-                    )
-                  : PushDownButton(
-                      color: const Color(0xFF38BDF8),
-                      onTap: () {
-                        widget.onCreateNewWheel();
-                        Navigator.pop(context);
-                      },
-                                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 22),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(LucideIcons.plus, color: Colors.white, size: 22),
-                            SizedBox(width: 12),
-                            Text('Create New Wheel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                          ],
-                        ),
-                      ),
-                    ),
+              child: PushDownButton(
+                color: const Color(0xFF38BDF8),
+                onTap: () async {
+                  await widget.onCreateNewWheel();
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 22),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(LucideIcons.plus, color: Colors.white, size: 22),
+                      SizedBox(width: 12),
+                      Text('Create New Wheel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -1911,5 +1911,73 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet>
         ],
       ),
     );
+  }
+}
+
+class _WheelThumbnail extends StatelessWidget {
+  final List<WheelItem> items;
+
+  const _WheelThumbnail({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _WheelThumbnailPainter(items),
+    );
+  }
+}
+
+class _WheelThumbnailPainter extends CustomPainter {
+  final List<WheelItem> items;
+
+  _WheelThumbnailPainter(this.items);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = min(size.width, size.height) / 2;
+    final totalWeight = items.fold<double>(0.0, (sum, item) => sum + item.weight);
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    // Gray background to fill anti-aliasing gaps
+    canvas.drawCircle(center, radius, Paint()..color = const Color(0xFFD4D4D8));
+
+    double startAngle = -pi / 2;
+    for (final item in items) {
+      final sweep = (item.weight / totalWeight) * 2 * pi;
+      paint.color = item.color;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweep,
+        true,
+        paint,
+      );
+      startAngle += sweep;
+    }
+
+    // Inner stroke
+    canvas.drawCircle(
+      center,
+      radius - 0.75,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..color = Colors.black.withValues(alpha: 0.15)
+        ..strokeWidth = 1.5,
+    );
+    // Outer stroke
+    canvas.drawCircle(
+      center,
+      radius + 0.75,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..color = Colors.black.withValues(alpha: 0.15)
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_WheelThumbnailPainter oldDelegate) {
+    return oldDelegate.items != items;
   }
 }

@@ -632,6 +632,7 @@ class SpinningWheelState extends State<SpinningWheel>
             ),
           ),
         ),
+        SizedBox(height: 8 * widget.headerOpacity),
         Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,

@@ -85,8 +85,10 @@ class _SwipeableActionCellState extends State<SwipeableActionCell>
     setState(() {
       _dragOffset += details.primaryDelta ?? 0;
 
-      // Limit drag extent to exactly 100%
-      _dragOffset = _dragOffset.clamp(-_maxDragExtent, _maxDragExtent);
+      // Prevent dragging in a direction with no actions
+      final maxRight = widget.leadingActions.isNotEmpty ? _maxDragExtent : 0.0;
+      final maxLeft = widget.trailingActions.isNotEmpty ? _maxDragExtent : 0.0;
+      _dragOffset = _dragOffset.clamp(-maxLeft, maxRight);
     });
   }
 
